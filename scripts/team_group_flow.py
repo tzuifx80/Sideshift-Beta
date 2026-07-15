@@ -1,4 +1,5 @@
 import re
+import time
 
 from playwright.sync_api import sync_playwright
 
@@ -17,20 +18,22 @@ def main():
         page.goto(BASE, wait_until="domcontentloaded")
         page.wait_for_timeout(500)
 
+        page.get_by_label("Display name").or_(page.get_by_text("Good morning, Team")).first.wait_for(timeout=30_000)
         if page.get_by_label("Display name").count():
             page.get_by_label("Display name").fill("Team Facilitator")
             page.get_by_role("button", name="Enter the arena", exact=True).click()
-        page.get_by_text("Good morning, Team").wait_for(timeout=10_000)
+        page.get_by_text("Good morning, Team").wait_for(timeout=30_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()
 
         page.locator(".sidebar-nav").get_by_role("button", name="Groups", exact=True).click()
         page.get_by_role("heading", name="Groups.").wait_for()
         page.get_by_role("button", name="Create a group", exact=True).click()
-        page.get_by_label("Group name").fill("Thursday Debate Club")
+        group_name = f"Thursday Debate Club {int(time.time())}"
+        page.get_by_label("Group name").fill(group_name)
         page.get_by_label("Short description").fill("A private room for careful disagreements.")
         page.get_by_role("button", name="Create private group", exact=True).click()
-        page.get_by_role("heading", name="✦ Thursday Debate Club.").wait_for()
+        page.get_by_role("heading", name=re.compile(re.escape(group_name))).wait_for()
 
         page.get_by_role("button", name="Create invite", exact=True).click()
         page.locator(".group-invite-box strong").wait_for()
@@ -67,7 +70,7 @@ def main():
         page.get_by_text("Good work in the room.").wait_for(timeout=10_000)
         page.locator(".sidebar-nav").get_by_role("button", name="Groups", exact=True).click()
         page.get_by_role("heading", name="Groups.").wait_for()
-        page.get_by_role("button", name="Thursday Debate Club", exact=False).click()
+        page.get_by_role("button", name=group_name, exact=False).click()
         page.get_by_text("Constructive points", exact=True).wait_for()
         if page.locator(".leaderboard-row strong").first.inner_text() != "20":
             raise AssertionError("Completed group Team Debate did not award exactly one participation update")

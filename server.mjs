@@ -19,6 +19,7 @@ const appBaseUrl = process.env.APP_BASE_URL || ''
 const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : '*')).split(',').map(value => value.trim()).filter(Boolean))
 const aiApiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || ''
 const aiModel = process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini'
+const serverAiMode = mockAi ? 'mock' : aiApiKey ? 'basic_server_available' : 'basic_server_unavailable'
 const rateWindowMs = 60_000
 const rateLimits = new Map()
 const analyticsEvents = ['landing_viewed', 'onboarding_started', 'onboarding_completed', 'take_viewed', 'debate_started', 'debate_round_submitted', 'debate_completed', 'result_viewed', 'share_attempted', 'challenge_created', 'challenge_opened', 'challenge_completed', 'second_debate_started', 'report_submitted', 'installation_action_used', 'recoverable_error_encountered']
@@ -45,7 +46,8 @@ function validateStartup() {
     if (!['private-beta', 'production'].includes(appEnvironment)) throw new Error('APP_ENV must be private-beta or production in production.')
     if (!appBaseUrl || !appBaseUrl.startsWith('https://')) missing.push('APP_BASE_URL (https://...)')
     if (!allowedOrigins.size || allowedOrigins.has('*')) missing.push('ALLOWED_ORIGINS (explicit HTTPS origin)')
-    if (!mockAi && !aiApiKey) missing.push('AI_API_KEY')
+    if (mockAi) missing.push('MOCK_AI=false with a configured AI provider')
+    else if (!aiApiKey) missing.push('AI_API_KEY')
     if (missing.length) throw new Error(`Missing or unsafe production configuration: ${missing.join(', ')}`)
   }
 }
@@ -246,7 +248,7 @@ async function callProvider(kind, input) {
 
 async function handleApi(req, res, url) {
   if (req.method === 'OPTIONS') return json(res, 204, {})
-  if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, status: 'ok', environment: appEnvironment, backend: dataBackend, persistence: dataBackend, aiMode: mockAi ? 'MOCK_AI' : aiProvider })
+  if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, status: 'ok', environment: appEnvironment, backend: dataBackend, persistence: dataBackend, aiMode: serverAiMode, ai: { provider: mockAi ? 'mock' : 'server', basicServerAvailable: serverAiMode === 'basic_server_available' } })
   if (url.pathname === '/api/ai/opponent' && req.method === 'POST') {
     if (rateLimit(req, 'opponent', 20)) { res.setHeader('retry-after', '60'); return error(res, 429, 'Too many opponent requests. Wait a minute and try again.', 'rate_limited') }
     try { return json(res, 200, await callProvider('opponent', opponentInput.parse(await body(req)))) } catch (caught) { logEvent(req, 'ai_opponent_failed', { provider: aiProvider }); return error(res, caught?.name === 'ZodError' ? 400 : 502, caught?.name === 'ZodError' ? caught.message : 'Opponent service is temporarily unavailable.', 'ai_unavailable') }
@@ -257,7 +259,7 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/ai/team-review' && req.method === 'POST') {
     if (rateLimit(req, 'team-review', 5)) { res.setHeader('retry-after', '60'); return error(res, 429, 'Too many team reviews. Try again later.', 'rate_limited') }
-    try { const input = teamReviewInput.parse(await body(req)); return json(res, 200, { review: await callProvider('teamReview', input), aiMode: mockAi ? 'MOCK_AI' : aiProvider }) } catch (caught) { logEvent(req, 'ai_team_review_failed', { provider: aiProvider }); return error(res, caught?.name === 'ZodError' ? 400 : 502, caught?.name === 'ZodError' ? caught.message : 'Team review is temporarily unavailable. No score was saved.', 'ai_unavailable') }
+    try { const input = teamReviewInput.parse(await body(req)); return json(res, 200, { review: await callProvider('teamReview', input), aiMode: serverAiMode }) } catch (caught) { logEvent(req, 'ai_team_review_failed', { provider: aiProvider }); return error(res, caught?.name === 'ZodError' ? 400 : 502, caught?.name === 'ZodError' ? caught.message : 'Team review is temporarily unavailable. No score was saved.', 'ai_unavailable') }
   }
   if (url.pathname === '/api/analytics' && req.method === 'POST') {
     if (rateLimit(req, 'analytics', 60)) { res.setHeader('retry-after', '60'); return error(res, 429, 'Analytics is receiving too many events. Try again later.', 'rate_limited') }
@@ -350,4 +352,4 @@ const server = createServer(async (req, res) => {
   }
 })
 
-server.listen(port, host, () => console.log(`SideShift API listening on http://${host}:${port} (${mockAi ? 'MOCK_AI' : aiProvider})`))
+server.listen(port, host, () => console.log(`SideShift API listening on http://${host}:${port} (${serverAiMode})`))

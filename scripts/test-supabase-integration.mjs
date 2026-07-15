@@ -101,8 +101,12 @@ const bReports = await b.client.from('reports').select('id').eq('reporter_id', a
 if (bReports.error) fail(`report privacy query failed: ${bReports.error.message}`)
 deniedRows(bReports.data, 'user B reports')
 
-const feedback = await a.client.from('beta_feedback').insert({ owner_id: a.user.id, category: 'suggestion', message: 'Integration feedback only.', surface: 'settings', screen: 'settings', ai_model_id: null, app_version: 'integration-test' }).select('id').single()
-if (feedback.error) fail(`beta feedback persistence failed: ${feedback.error.message}`)
+const directFeedback = await a.client.from('beta_feedback').insert({ owner_id: a.user.id, category: 'suggestion', message: 'Direct feedback write must be rejected.', surface: 'settings', screen: 'settings', ai_model_id: null, app_version: 'integration-direct-write' })
+deniedError(directFeedback.error, 'user A wrote beta feedback directly')
+const feedbackRpc = await a.client.rpc('submit_beta_feedback', { p_category: 'suggestion', p_message: 'Integration feedback only.', p_surface: 'settings', p_screen: 'settings', p_ai_model_id: null, p_app_version: 'integration-test' })
+if (feedbackRpc.error) fail('beta feedback RPC persistence failed: ' + feedbackRpc.error.message)
+const feedback = await a.client.from('beta_feedback').select('id').eq('owner_id', a.user.id).eq('app_version', 'integration-test').single()
+if (feedback.error) fail('beta feedback row lookup failed: ' + feedback.error.message)
 const bFeedback = await b.client.from('beta_feedback').select('id').eq('owner_id', a.user.id)
 if (bFeedback.error) fail(`beta feedback privacy query failed: ${bFeedback.error.message}`)
 deniedRows(bFeedback.data, 'user B beta feedback')
@@ -125,4 +129,4 @@ const deletedFeedback = await a.client.from('beta_feedback').select('id').eq('id
 if (deletedFeedback.error) fail(`user A beta feedback deletion check failed: ${deletedFeedback.error.message}`)
 noRows(deletedFeedback.data, 'user A beta feedback after deletion')
 
-console.log(`SUPABASE_INTEGRATION_OK auth=2 profiles=2 preferences=1 debates=1 turns=1 stances=1 results=1 challenges=2 reports=1 beta_feedback=1 rls_denials=${rlsDenials} challenge_checks=self_response,second_user,duplicate,expired,creator_result,responder_result deletion=owner_only,responder_anonymized,feedback_removed`)
+console.log(`SUPABASE_INTEGRATION_OK auth=2 profiles=2 preferences=1 debates=1 turns=1 stances=1 results=1 challenges=2 reports=1 beta_feedback_rpc=1 direct_feedback_denied=1 rls_denials=${rlsDenials} challenge_checks=self_response,second_user,duplicate,expired,creator_result,responder_result deletion=owner_only,responder_anonymized,feedback_removed`)

@@ -28,6 +28,7 @@
     "test:production-smoke": "node --env-file-if-exists=.env scripts/test-production-smoke.mjs",
     "test:pwa": "node scripts/test-pwa.mjs",
     "audit:frontend-secrets": "node scripts/scan-frontend-secrets.mjs",
+    "test:encoding": "node scripts/check-encoding.mjs",
     "audit:deps": "npm audit --omit=dev",
     "cap:sync": "npm run build && npx cap sync android",
     "cap:open": "npx cap open android",

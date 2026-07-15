@@ -27,7 +27,10 @@ artifacts/
 coverage/
 playwright-report/
 test-results/
+__pycache__/
 
 # Local uploads and generated service-worker output
 uploads/
 supabase/.temp/
+.codex-*.log
+.codex-*.err

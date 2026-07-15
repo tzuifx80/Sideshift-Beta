@@ -1,4 +1,6 @@
 export type AiConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'failed'
+export type AiRuntimeStatus = 'mock' | 'basic_server_available' | 'basic_server_unavailable' | 'puter_disconnected' | 'puter_connecting' | 'puter_connected' | 'puter_error'
+export type AiRuntimeSnapshot = { primary: AiRuntimeStatus; puter: AiRuntimeStatus; basicServer: 'basic_server_available' | 'basic_server_unavailable' }
 export type AiFamily = 'Gemini' | 'Claude' | 'GPT' | 'DeepSeek'
 export type AiDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert'
 export type AiRoundLength = 'quick' | 'standard' | 'deep'

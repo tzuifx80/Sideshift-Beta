@@ -3,6 +3,7 @@ import { buildDebateContext, buildEvaluationContext, deriveAdaptiveDebateState }
 import { AiProviderError, normalizeAiError } from './errors'
 import { normalizeModels, resolveOpponents } from './modelResolver'
 import { createMockAiProvider } from './provider'
+import { createAiRuntimeSnapshot } from './runtimeStatus'
 
 describe('Puter AI boundary', () => {
   it('normalizes models and prefers efficient family-correct models', () => {
@@ -59,5 +60,13 @@ describe('Puter AI boundary', () => {
     for await (const chunk of stream.chunks) { output += chunk; stream.stop(); break }
     expect(output.length).toBeGreaterThan(0)
     await expect(createMockAiProvider().streamChat({ modelId: 'gpt-5-mini', messages: [], maxTokens: 50 })).rejects.toBeInstanceOf(AiProviderError)
+  })
+})
+
+describe('truthful AI runtime states', () => {
+  it('keeps mock, Puter, and server capability states separate', () => {
+    expect(createAiRuntimeSnapshot({ mock: true, puterStatus: 'disconnected', basicServerAvailable: false })).toMatchObject({ primary: 'mock', puter: 'mock', basicServer: 'basic_server_unavailable' })
+    expect(createAiRuntimeSnapshot({ mock: false, puterStatus: 'disconnected', basicServerAvailable: true })).toMatchObject({ primary: 'puter_disconnected', puter: 'puter_disconnected', basicServer: 'basic_server_available' })
+    expect(createAiRuntimeSnapshot({ mock: false, puterStatus: 'connected', basicServerAvailable: false })).toMatchObject({ primary: 'puter_connected', puter: 'puter_connected', basicServer: 'basic_server_unavailable' })
   })
 })

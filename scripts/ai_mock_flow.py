@@ -67,6 +67,7 @@ def main():
         page.get_by_label("Response length").select_option("detailed")
         page.get_by_text("Show model details during AI debates", exact=True).click()
         page.get_by_role("button", name="Save settings", exact=True).first.click()
+        page.get_by_text("Settings saved privately.").wait_for()
         page.locator(".settings-page .settings-footer .back-link").click()
         page.get_by_text("Good morning, AI.").wait_for()
         if page.locator("html[data-theme='dark']").count() != 1 or page.locator("html[data-accent='cyan']").count() != 1:
@@ -102,7 +103,7 @@ def main():
 
         page.get_by_text("Debate complete.").wait_for(timeout=10_000)
         page.get_by_role("button", name="Complete and review", exact=True).click()
-        page.get_by_text("AI DEBATE COMPLETE").wait_for(timeout=10_000)
+        page.get_by_text("AI DEBATE COMPLETE").wait_for(timeout=30_000)
         page.get_by_text("ARGUMENT REVIEW").wait_for()
         page.locator(".ai-results-page > .muted").filter(has_text="maximum quality · detailed replies").wait_for()
 

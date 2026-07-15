@@ -358,7 +358,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to send feedback.')
     const input = z.object({ category: z.enum(['broken', 'ai_quality', 'design_usability', 'missing_topic', 'suggestion', 'other']), message: z.string().trim().max(600).nullable().optional(), surface: z.enum(['settings', 'debate_result']), screen: z.string().trim().min(1).max(40), aiModelId: z.string().trim().max(160).nullable().optional(), appVersion: z.string().trim().min(1).max(40) }).safeParse(payload)
     if (!input.success) throw new RepositoryErrorClass('validation', 'Choose a feedback type and keep the message under 600 characters.')
-    const { error } = await client.from('beta_feedback').insert({ owner_id: userId, category: input.data.category, message: input.data.message || null, surface: input.data.surface, screen: input.data.screen, ai_model_id: input.data.aiModelId || null, app_version: input.data.appVersion })
+    const { error } = await client.rpc('submit_beta_feedback', { p_category: input.data.category, p_message: input.data.message || null, p_surface: input.data.surface, p_screen: input.data.screen, p_ai_model_id: input.data.aiModelId || null, p_app_version: input.data.appVersion })
     if (error) throw mapSupabaseError('sending beta feedback', error)
   }
 
@@ -374,12 +374,17 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
   async function saveTeamSession(userId: string, session: TeamDebateSession | null): Promise<void> {
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to save a Team Debate session.')
     if (!session) {
-      const { error } = await client.from('team_debate_sessions').update({ status: 'ended', updated_at: new Date().toISOString() }).eq('facilitator_id', userId).in('status', ['active', 'paused'])
-      if (error) throw mapSupabaseError('closing your Team Debate session', error)
+      const { data, error } = await client.from('team_debate_sessions').select('snapshot').eq('facilitator_id', userId).in('status', ['active', 'paused']).order('updated_at', { ascending: false }).limit(1).maybeSingle()
+      if (error) throw mapSupabaseError('loading your active Team Debate session', error)
+      if (!data) return
+      const current = validateJson(teamDebateSessionSchema, asRow(data).snapshot, 'Team Debate session')
+      const ended = { ...current, status: 'ended' as const, updatedAt: new Date().toISOString() }
+      const { error: saveError } = await client.rpc('save_team_debate_session', { p_id: ended.id, p_group_id: ended.groupId, p_status: ended.status, p_topic: ended.topic, p_teams: ended.teams, p_snapshot: ended, p_completed_at: ended.result?.completedAt || null, p_updated_at: ended.updatedAt })
+      if (saveError) throw mapSupabaseError('closing your Team Debate session', saveError)
       return
     }
     const checked = validateJson(teamDebateSessionSchema, session, 'Team Debate session')
-    const { error } = await client.from('team_debate_sessions').upsert({ id: checked.id, facilitator_id: userId, group_id: checked.groupId, status: checked.status, topic: checked.topic, teams: checked.teams, snapshot: checked, updated_at: checked.updatedAt, completed_at: checked.result?.completedAt || null }, { onConflict: 'id' })
+    const { error } = await client.rpc('save_team_debate_session', { p_id: checked.id, p_group_id: checked.groupId, p_status: checked.status, p_topic: checked.topic, p_teams: checked.teams, p_snapshot: checked, p_completed_at: checked.result?.completedAt || null, p_updated_at: checked.updatedAt })
     if (error) throw mapSupabaseError('saving your Team Debate session', error)
   }
 
