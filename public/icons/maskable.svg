@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SideShift maskable icon">
+  <rect width="512" height="512" fill="#eb6c58"/>
+  <circle cx="256" cy="256" r="176" fill="#f7f5f0" opacity=".18"/>
+  <path d="M190 156c-28 38-42 74-42 108 0 38 16 76 47 114" fill="none" stroke="#fffefa" stroke-linecap="round" stroke-width="34"/>
+  <path d="M322 156c28 38 42 74 42 108 0 38-16 76-47 114" fill="none" stroke="#fffefa" stroke-linecap="round" stroke-width="34"/>
+  <path d="M209 256h94" fill="none" stroke="#fffefa" stroke-linecap="round" stroke-width="34"/>
+</svg>

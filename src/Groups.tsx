@@ -1,0 +1,74 @@
+import { useEffect, useState } from 'react'
+import { takes, type Language } from './domain'
+import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupSummary, GroupTopic } from './collaboration'
+import type { AppRepository } from './data/repository'
+
+type GroupsProps = {
+  userId: string
+  language: Language
+  repository: AppRepository
+  onStartTeam: (topic: GroupTopic | null, group: GroupSummary) => void
+  onBack: () => void
+  onNotify: (message: string) => void
+  initialGroupId?: string
+}
+
+function GroupForm({ language, onSubmit, onCancel }: { language: Language; onSubmit: (input: CreateGroupInput) => Promise<void>; onCancel?: () => void }) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [rules, setRules] = useState('')
+  const [leaderboardEnabled, setLeaderboardEnabled] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function submit() {
+    if (name.trim().length < 2 || name.trim().length > 60) return setError('Give the group a name between 2 and 60 characters.')
+    if (description.length > 240 || rules.length > 600) return setError('Keep the description under 240 and rules under 600 characters.')
+    setBusy(true); setError('')
+    try { await onSubmit({ name, description, rules, icon: '✦', accent: 'coral', language, memberLimit: null, leaderboardEnabled }) } catch (caught) { setError(caught instanceof Error ? caught.message : 'The group could not be created.') } finally { setBusy(false) }
+  }
+  return <section className="card-surface group-form"><div className="settings-section-heading"><div><span className="eyebrow">PRIVATE GROUP</span><h2>Create a group</h2></div></div><label className="field-label">Group name<input className="text-input" maxLength={60} value={name} onChange={event => setName(event.target.value)} placeholder="Example: Thursday Debate Club" /></label><label className="field-label">Short description<textarea className="settings-textarea" maxLength={240} value={description} onChange={event => setDescription(event.target.value)} placeholder="Who is this room for?" /></label><label className="field-label">Group rules<textarea className="settings-textarea" maxLength={600} value={rules} onChange={event => setRules(event.target.value)} placeholder="Optional: disagree with care…" /></label><label className="toggle-row"><input type="checkbox" checked={leaderboardEnabled} onChange={event => setLeaderboardEnabled(event.target.checked)} /><span>Enable constructive participation points</span><small>Points reward completed participation and fairness, never ideology or message volume.</small></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="group-form-actions"><button type="button" className="button button-primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Creating…' : 'Create private group'}</button>{onCancel && <button type="button" className="button button-ghost" onClick={onCancel}>Cancel</button>}</div></section>
+}
+
+function GroupDetailView({ detail, language, repository, userId, onStartTeam, onBack, onNotify, onReload }: { detail: GroupDetail; language: Language; repository: AppRepository; userId: string; onStartTeam: (topic: GroupTopic | null, group: GroupSummary) => void; onBack: () => void; onNotify: (message: string) => void; onReload: () => Promise<void> }) {
+  const [invite, setInvite] = useState<string | null>(null)
+  const [topic, setTopic] = useState<CreateGroupTopicInput>({ statement: '', context: '', sideLabels: ['Support', 'Question'], category: 'Group topic', language, sensitivity: 'standard' })
+  const [topicError, setTopicError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const isManager = detail.role === 'owner' || detail.role === 'moderator'
+  async function createInvite() {
+    try { const created = await repository.createGroupInvite(userId, detail.id); setInvite(created.code); await onReload(); onNotify('Invite created. Share the code privately; it expires in seven days.') } catch (caught) { onNotify(caught instanceof Error ? caught.message : 'The invite could not be created.') }
+  }
+  async function createTopic() {
+    if (topic.statement.trim().length < 8 || topic.statement.trim().length > 240) return setTopicError('Keep the topic between 8 and 240 characters.')
+    setBusy(true); setTopicError('')
+    try { await repository.createGroupTopic(userId, detail.id, topic); setTopic({ ...topic, statement: '', context: '' }); await onReload(); onNotify(isManager ? 'Group topic added.' : 'Topic suggestion sent to the moderators.') } catch (caught) { setTopicError(caught instanceof Error ? caught.message : 'The topic could not be saved.') } finally { setBusy(false) }
+  }
+  async function copyInvite() { if (invite && navigator.clipboard) { await navigator.clipboard.writeText(invite); onNotify('Invite code copied.') } }
+  return <div className="page groups-page"><button type="button" className="back-link" onClick={onBack}>← Groups</button><div className="page-heading group-heading"><div><span className="eyebrow">PRIVATE {detail.role.toUpperCase()}</span><h1>{detail.icon} {detail.name}<span className="heading-period">.</span></h1><p className="muted">{detail.description || 'A private room for constructive disagreement.'}</p></div><span className="group-member-count">{detail.members.length} member{detail.members.length === 1 ? '' : 's'}</span></div><div className="group-dashboard-grid"><section className="card-surface group-main-card"><div className="group-action-row"><button type="button" className="button button-primary" onClick={() => onStartTeam(null, detail)}>Start Team Debate</button>{isManager && <button type="button" className="button button-secondary" onClick={() => void createInvite()}>Create invite</button>}</div>{invite && <div className="group-invite-box"><span className="eyebrow">PRIVATE INVITE CODE</span><strong>{invite}</strong><button type="button" className="button button-ghost" onClick={() => void copyInvite()}>Copy</button><small>Anyone with this code can request membership until it expires. Do not post it publicly.</small></div>}<div className="group-section-heading"><div><span className="eyebrow">GROUP TOPICS</span><h2>Topics for this room</h2></div></div>{detail.topics.length ? <div className="group-topic-list">{detail.topics.map(item => <article key={item.id} className="group-topic-card"><div><span className="eyebrow">{item.category} · {item.status === 'pending' ? 'NEEDS REVIEW' : item.sensitivity.toUpperCase()}</span><h3>{item.statement}</h3><p>{item.context}</p></div><button type="button" className="round-arrow" onClick={() => onStartTeam(item, detail)}>Debate →</button></article>)}</div> : <p className="muted group-empty">No group-only topics yet. Add the first motion below.</p>}<div className="group-topic-create"><span className="eyebrow">SUGGEST A TOPIC</span><label className="field-label">Statement<input className="text-input" maxLength={240} value={topic.statement} onChange={event => setTopic(current => ({ ...current, statement: event.target.value }))} placeholder="A motion for this group only" /></label><label className="field-label">Neutral context<textarea className="settings-textarea" maxLength={600} value={topic.context} onChange={event => setTopic(current => ({ ...current, context: event.target.value }))} placeholder="What should teams know?" /></label><div className="settings-fields-grid"><label className="field-label">Support label<input className="text-input" maxLength={28} value={topic.sideLabels[0]} onChange={event => setTopic(current => ({ ...current, sideLabels: [event.target.value, current.sideLabels[1]] }))} /></label><label className="field-label">Question label<input className="text-input" maxLength={28} value={topic.sideLabels[1]} onChange={event => setTopic(current => ({ ...current, sideLabels: [current.sideLabels[0], event.target.value] }))} /></label></div><label className="field-label">Sensitivity<select className="settings-select" value={topic.sensitivity} onChange={event => setTopic(current => ({ ...current, sensitivity: event.target.value as CreateGroupTopicInput['sensitivity'] }))}><option value="standard">Standard</option><option value="sensitive">Sensitive — moderator review</option></select></label>{topicError && <p className="form-error" role="alert">{topicError}</p>}<button type="button" className="button button-secondary" onClick={() => void createTopic()} disabled={busy}>{busy ? 'Saving…' : 'Save group topic'}</button></div></section><aside className="group-sidebar"><section className="card-surface group-members-card"><div className="group-section-heading"><div><span className="eyebrow">MEMBERS</span><h2>People in the room</h2></div></div><div className="group-member-list">{detail.members.map(member => <div key={member.userId}><span className="avatar avatar-coral">{member.displayName.slice(0, 1).toUpperCase()}</span><span><strong>{member.displayName}</strong><small>{member.role} · {member.points} points</small></span></div>)}</div>{detail.rules && <p className="group-rules"><strong>Group rules</strong>{detail.rules}</p>}</section>{detail.leaderboardEnabled && <section className="card-surface group-leaderboard"><div className="group-section-heading"><div><span className="eyebrow">PRIVATE LEADERBOARD</span><h2>Constructive points</h2></div></div><p className="field-help">Points reward completed debates, team participation and fairness. They do not rank beliefs.</p>{detail.members.slice().sort((a, b) => b.points - a.points).map((member, index) => <div className="leaderboard-row" key={member.userId}><b>{index + 1}</b><span>{member.displayName}</span><strong>{member.points}</strong></div>)}</section>}</aside></div></div>
+}
+
+export function Groups({ userId, language, repository, onStartTeam, onBack, onNotify, initialGroupId }: GroupsProps) {
+  const [groups, setGroups] = useState<GroupSummary[]>([])
+  const [selected, setSelected] = useState<GroupDetail | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  async function reload() {
+    setLoading(true); setError('')
+    try { const next = await repository.listGroups(userId); setGroups(next); if (selected) setSelected(await repository.loadGroup(userId, selected.id)) } catch (caught) { setError(caught instanceof Error ? caught.message : 'Groups could not be loaded.') } finally { setLoading(false) }
+  }
+  useEffect(() => {
+    void (async () => {
+      await reload()
+      if (initialGroupId) {
+        try { setSelected(await repository.loadGroup(userId, initialGroupId)) } catch (caught) { setError(caught instanceof Error ? caught.message : 'This private group could not be opened.') }
+      }
+    })()
+  }, [initialGroupId, repository, userId])
+  async function create(input: CreateGroupInput) { const created = await repository.createGroup(userId, input); await reload(); const next = await repository.loadGroup(userId, created.id); setSelected(next); setShowCreate(false); onNotify('Private group created.') }
+  async function join() { if (!inviteCode.trim()) return; try { const joined = await repository.joinGroupByInvite(userId, inviteCode); await reload(); setSelected(await repository.loadGroup(userId, joined.id)); setInviteCode(''); onNotify('You joined the private group.') } catch (caught) { setError(caught instanceof Error ? caught.message : 'The invite could not be used.') } }
+  if (selected) return <GroupDetailView detail={selected} language={language} repository={repository} userId={userId} onStartTeam={onStartTeam} onBack={() => setSelected(null)} onNotify={onNotify} onReload={reload} />
+  return <div className="page groups-page"><div className="page-heading"><div><span className="eyebrow">PRIVATE ROOMS</span><h1>Groups<span className="heading-period">.</span></h1><p className="muted">Invite-only rooms for classes, clubs, families and friends. No public discovery, feed or direct messages.</p></div><button type="button" className="button button-primary" onClick={() => setShowCreate(value => !value)}>Create a group</button></div>{showCreate && <GroupForm language={language} onSubmit={create} onCancel={() => setShowCreate(false)} />}<section className="card-surface group-join-card"><div><span className="eyebrow">HAVE AN INVITE?</span><h2>Join a private room</h2><p className="muted">Invite codes are checked before any group content is shown.</p></div><div className="group-join-form"><input className="text-input" maxLength={40} value={inviteCode} onChange={event => setInviteCode(event.target.value.toUpperCase())} placeholder="Paste invite code" /><button type="button" className="button button-secondary" onClick={() => void join()}>Join group</button></div></section>{error && <p className="form-error" role="alert">{error}</p>}{loading ? <p className="muted">Loading private groups…</p> : groups.length ? <div className="group-list">{groups.map(group => <button type="button" className="card-surface group-list-card" key={group.id} onClick={() => void repository.loadGroup(userId, group.id).then(setSelected).catch(caught => setError(caught instanceof Error ? caught.message : 'This group could not be opened.'))}><span className="group-list-icon">{group.icon}</span><span><strong>{group.name}</strong><small>{group.memberCount} members · {group.role} · {group.description || 'Private debate room'}</small></span><span>→</span></button>)}</div> : <div className="empty-state card-surface"><strong>Your private rooms will appear here.</strong><span>Create a group or use an invite code from a facilitator.</span></div>}<button type="button" className="back-link groups-back" onClick={onBack}>← Back to Home</button></div>
+}

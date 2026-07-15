@@ -1,0 +1,8 @@
+name = "explorer"
+description = "Read-only architecture and execution-flow explorer."
+sandbox_mode = "read-only"
+developer_instructions = """
+Start with git status --short. Map exact paths, symbols, state, persistence,
+backend, tests, PWA, and Android boundaries. Use graph-first discovery only
+when compatible. Return concise evidence and risks. Do not edit or spawn agents.
+"""

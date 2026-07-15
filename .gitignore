@@ -1,0 +1,33 @@
+node_modules/
+dist/
+artifacts-*.png
+.DS_Store
+.data/
+.env
+.env.*
+!.env.example
+!.env.private-beta.example
+!.env.test.example
+*.tsbuildinfo
+
+# Local IDE, Android SDK, and build state
+.idea/
+android/local.properties
+local.properties
+android/.gradle/
+android/**/build/
+*.apk
+*.aab
+
+# Generated, temporary, and test-run state
+artifacts/
+.codebase-memory/
+.tmp-server-test-data/
+.vibecoder-backups/
+coverage/
+playwright-report/
+test-results/
+
+# Local uploads and generated service-worker output
+uploads/
+supabase/.temp/

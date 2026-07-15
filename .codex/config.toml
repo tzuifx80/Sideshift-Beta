@@ -1,0 +1,6 @@
+# Copy selectively into the repository's .codex/config.toml.
+# Do not duplicate user-level model/provider configuration.
+
+[agents]
+max_threads = 3
+max_depth = 1
