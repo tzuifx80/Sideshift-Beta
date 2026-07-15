@@ -314,7 +314,7 @@ def run_flow(env: dict[str, str], diagnostics_dir: Path) -> None:
             open_app(page_a, "Context A")
             page_a.get_by_label("Display name").fill("Supabase A")
             page_a.get_by_role("button", name="Enter the arena").click()
-            page_a.get_by_text("Good morning, Supabase").wait_for(timeout=PAGE_TIMEOUT_MS)
+            page_a.get_by_text(re.compile(r"Good (morning|afternoon|evening), Supabase"), exact=False).wait_for(timeout=PAGE_TIMEOUT_MS)
             if page_a.get_by_role("dialog").count():
                 page_a.get_by_role("dialog").get_by_text("Got it", exact=True).click()
             page_a.get_by_role("button", name="Take a side").click()

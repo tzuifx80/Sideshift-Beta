@@ -37,7 +37,7 @@ export const debateSnapshotSchema: z.ZodType<DebateSnapshot> = z.object({
   responses: z.record(z.string(), z.string().max(350)),
   opponentMessages: z.record(z.string(), z.string().max(700)),
   assignedSide: z.string().max(120),
-  language: z.enum(['en', 'de']),
+  language: z.enum(['en', 'de', 'fr', 'es', 'it']),
   status: z.enum(['active', 'completed']),
   updatedAt: z.string(),
   ai: z.object({
@@ -87,7 +87,7 @@ export const challengeRecordSchema = z.object({
 })
 
 export const teamDebateSessionSchema: z.ZodType<TeamDebateSession> = z.object({
-  id: z.string().min(1), facilitatorId: z.string().uuid(), groupId: z.string().uuid().nullable(), language: z.enum(['en', 'de']),
+  id: z.string().min(1), facilitatorId: z.string().uuid(), groupId: z.string().uuid().nullable(), language: z.enum(['en', 'de', 'fr', 'es', 'it']),
   topic: z.object({ statement: z.string().min(8).max(240), context: z.string().max(600), takeId: z.string().nullable(), custom: z.boolean() }),
   teams: z.array(z.object({ id: z.string().min(1), name: z.string().min(1).max(32), color: z.enum(['team-a', 'team-b', 'team-c', 'team-d']), icon: z.string().max(8) })).min(2).max(4),
   format: z.enum(['rounds', 'timer']), rounds: z.number().int().min(1).max(8), roundTypes: z.array(z.enum(['opening', 'argument', 'rebuttal', 'question', 'answer', 'closing'])).min(1), teamTurnSeconds: z.number().int().min(20).max(600), totalSeconds: z.number().int().min(60).max(7200), preparationSeconds: z.number().int().min(0).max(300), closingRound: z.boolean(), scoring: z.enum(['none', 'facilitator', 'ai']), status: z.enum(['active', 'paused', 'completed', 'ended']), currentTurnIndex: z.number().int().min(0), remainingSeconds: z.number().int().min(0).max(7200),

@@ -9,7 +9,7 @@ export const userProfileSchema = z.object({
   displayName: z.string().trim().max(24).nullable(),
   bio: z.string().trim().max(160).nullable(),
   avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']),
-  interfaceLanguage: z.enum(['en', 'de']),
+  interfaceLanguage: z.enum(['en', 'de', 'fr', 'es', 'it']),
   challengeShowName: z.boolean(),
   shareRealStance: z.boolean(),
 })
@@ -17,7 +17,7 @@ export const userProfileSchema = z.object({
 export const userPreferencesSchema = z.object({
   userId: z.string().min(1),
   topicPreferences: z.array(z.string().min(1).max(80)).min(0).max(32),
-  debateLanguages: z.array(z.enum(['en', 'de'])).min(1).max(2),
+  debateLanguages: z.array(z.enum(['en', 'de', 'fr', 'es', 'it'])).min(1).max(2),
   intensity: z.string().max(40).nullable(),
   preferredMode: z.enum(['classic', 'sideswitch', 'blindside', 'commonground']),
   preferredAiStyle: z.string().max(40).nullable(),

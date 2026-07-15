@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import sync_playwright
 
 
@@ -29,7 +31,7 @@ def main():
         if page.get_by_label("Display name").count():
             page.get_by_label("Display name").fill("AI Integration Tester")
             page.get_by_role("button", name="Enter the arena").click()
-        page.get_by_text("Good morning, AI.").wait_for(timeout=10_000)
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI\."), exact=False).wait_for(timeout=10_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()
         page.get_by_role("button", name="Start a debate", exact=True).first.click()
@@ -40,7 +42,7 @@ def main():
             raise AssertionError("Unavailable opponent state was not rendered before Puter connection.")
 
         page.locator(".ai-setup-page .back-link").click()
-        page.get_by_text("Good morning, AI.").wait_for()
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI\."), exact=False).wait_for()
         page.get_by_role("button", name="Start a debate", exact=True).first.click()
         page.locator(".debate-choice-person").click()
         page.get_by_text("FRIEND CLASH", exact=True).wait_for()
@@ -49,16 +51,17 @@ def main():
             raise AssertionError("Human challenge flow exposed the Puter connection prompt.")
 
         page.locator(".clash-page > .back-link").click()
-        page.get_by_text("Good morning, AI.").wait_for()
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI\."), exact=False).wait_for()
         page.get_by_role("button", name="Start a debate", exact=True).first.click()
         page.locator(".debate-choice-ai").click()
         page.get_by_text("AI DEBATE SETUP").wait_for()
         page.get_by_role("button", name="Activate mock AI", exact=True).click()
-        page.get_by_text("Puter connected").wait_for(timeout=10_000)
+        page.get_by_text("Connected", exact=True).wait_for(timeout=10_000)
         page.get_by_text("Compatible live model available").wait_for(timeout=10_000)
         page.get_by_label("Theme").count()
         page.locator(".ai-setup-page .back-link").click()
-        page.get_by_role("button", name="Settings", exact=True).first.click()
+        page.locator(".sidebar-nav").get_by_role("button", name="Profile", exact=True).click()
+        page.get_by_role("button", name="Edit profile", exact=True).click()
         page.get_by_label("Theme").select_option("dark")
         page.locator(".accent-option.accent-cyan").click()
         page.get_by_label("Preferred opponent").select_option("ask")
@@ -66,10 +69,11 @@ def main():
         page.get_by_label("Model quality").select_option("maximum")
         page.get_by_label("Response length").select_option("detailed")
         page.get_by_text("Show model details during AI debates", exact=True).click()
-        page.get_by_role("button", name="Save settings", exact=True).first.click()
+        page.get_by_role("button", name="Save", exact=True).last.click()
         page.get_by_text("Settings saved privately.").wait_for()
         page.locator(".settings-page .settings-footer .back-link").click()
-        page.get_by_text("Good morning, AI.").wait_for()
+        page.locator(".sidebar-nav").get_by_role("button", name="Home", exact=True).click()
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI\."), exact=False).wait_for()
         if page.locator("html[data-theme='dark']").count() != 1 or page.locator("html[data-accent='cyan']").count() != 1:
             raise AssertionError("Dark theme or cyan accent did not persist.")
         page.get_by_role("button", name="Start a debate", exact=True).first.click()
@@ -103,7 +107,7 @@ def main():
 
         page.get_by_text("Debate complete.").wait_for(timeout=10_000)
         page.get_by_role("button", name="Complete and review", exact=True).click()
-        page.get_by_text("AI DEBATE COMPLETE").wait_for(timeout=30_000)
+        page.get_by_text("Debate complete.", exact=True).wait_for(timeout=30_000)
         page.get_by_text("ARGUMENT REVIEW").wait_for()
         page.locator(".ai-results-page > .muted").filter(has_text="maximum quality · detailed replies").wait_for()
 

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import re
+
 from playwright.sync_api import sync_playwright
 
 
@@ -17,7 +19,7 @@ def main():
         if page.get_by_label("Display name").count():
             page.get_by_label("Display name").fill("Visual Tester")
             page.get_by_role("button", name="Enter the arena").click()
-        page.get_by_text("Good morning, Visual.").wait_for(timeout=10_000)
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Visual\."), exact=False).wait_for(timeout=10_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()
 
@@ -40,7 +42,7 @@ def main():
         page.locator(".accent-option.accent-cyan").click()
         page.get_by_role("button", name="Save settings", exact=True).first.click()
         page.locator(".settings-page .settings-footer .back-link").click()
-        page.get_by_text("Good morning, Visual.").wait_for()
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Visual\."), exact=False).wait_for()
         if page.locator("html[data-theme='dark']").count() != 1:
             raise AssertionError("Dark theme was not applied.")
         if page.locator("html[data-accent='cyan']").count() != 1:

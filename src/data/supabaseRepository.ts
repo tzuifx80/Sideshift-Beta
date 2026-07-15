@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { getTake, type DebateSnapshot, type ResultData, type Stance } from '../domain'
+import { getTake, type DebateSnapshot, type Language, type ResultData, type Stance } from '../domain'
 import { challengeRecordSchema, debateSnapshotSchema, resultDataSchema, teamDebateSessionSchema } from './schemas'
 import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, ReportInput, ReportRecord, RepositoryError } from './repository'
 import { RepositoryError as RepositoryErrorClass } from './repository'
@@ -10,7 +10,8 @@ import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite,
 type TableRow = Record<string, unknown>
 type SupabaseFailure = { code?: string; message?: string; details?: string }
 
-const profileRowSchema = z.object({ id: z.string().uuid(), display_name: z.string().nullable(), bio: z.string().nullable(), avatar_preset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), interface_language: z.enum(['en', 'de']), challenge_show_name: z.boolean(), share_real_stance: z.boolean() })
+const languageSchema = z.enum(['en', 'de', 'fr', 'es', 'it'])
+const profileRowSchema = z.object({ id: z.string().uuid(), display_name: z.string().nullable(), bio: z.string().nullable(), avatar_preset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), interface_language: languageSchema, challenge_show_name: z.boolean(), share_real_stance: z.boolean() })
 const preferencesRowSchema = z.object({ user_id: z.string().uuid(), topic_preferences: z.unknown(), debate_languages: z.unknown(), intensity: z.string().nullable(), preferred_mode: z.enum(['classic', 'sideswitch', 'blindside', 'commonground']), preferred_ai_style: z.string().nullable(), preferred_opponent_type: z.enum(['ask', 'ai', 'person']).default('ask'), preferred_ai_family: z.enum(['Gemini', 'Claude', 'GPT', 'DeepSeek']).default('GPT'), preferred_opponent_id: z.string(), preferred_ai_model_id: z.string().nullable().default(null), ai_difficulty: z.enum(['beginner', 'intermediate', 'advanced', 'expert']), ai_round_length: z.enum(['quick', 'standard', 'deep']), ai_quality: z.enum(['fast', 'balanced', 'maximum']).default('balanced'), ai_response_length: z.enum(['concise', 'standard', 'detailed']).default('standard'), show_model_details: z.boolean().default(false), theme: z.enum(['system', 'light', 'dark']), accent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), reduced_motion: z.boolean(), text_size: z.enum(['compact', 'comfortable']), share_real_stance: z.boolean(), onboarding_completed: z.boolean() })
 const reportRowSchema = z.object({ id: z.string(), status: z.string(), created_at: z.string() })
 
@@ -92,9 +93,9 @@ function mapReport(value: unknown): ReportRecord {
   return { id: parsed.data.id, status: parsed.data.status, createdAt: parsed.data.created_at }
 }
 
-const groupSummarySchema = z.object({ id: z.string().uuid(), name: z.string().min(1).max(60), description: z.string().max(240), icon: z.string().max(8), accent: z.string().max(32), language: z.enum(['en', 'de']), role: z.enum(['owner', 'moderator', 'member']), memberCount: z.number().int().min(0), leaderboardEnabled: z.boolean(), updatedAt: z.string() })
+const groupSummarySchema = z.object({ id: z.string().uuid(), name: z.string().min(1).max(60), description: z.string().max(240), icon: z.string().max(8), accent: z.string().max(32), language: languageSchema, role: z.enum(['owner', 'moderator', 'member']), memberCount: z.number().int().min(0), leaderboardEnabled: z.boolean(), updatedAt: z.string() })
 const groupMemberSchema = z.object({ userId: z.string().uuid(), displayName: z.string().min(1).max(80), role: z.enum(['owner', 'moderator', 'member']), points: z.number().int().min(0), debatesCompleted: z.number().int().min(0), constructive: z.boolean() })
-const groupTopicSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), statement: z.string().min(8).max(240), context: z.string().max(600), sideLabels: z.tuple([z.string().min(1).max(28), z.string().min(1).max(28)]), category: z.string().min(1).max(60), language: z.enum(['en', 'de']), sensitivity: z.enum(['standard', 'sensitive']), creatorId: z.string().uuid(), status: z.enum(['approved', 'pending', 'archived']), createdAt: z.string() })
+const groupTopicSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), statement: z.string().min(8).max(240), context: z.string().max(600), sideLabels: z.tuple([z.string().min(1).max(28), z.string().min(1).max(28)]), category: z.string().min(1).max(60), language: languageSchema, sensitivity: z.enum(['standard', 'sensitive']), creatorId: z.string().uuid(), status: z.enum(['approved', 'pending', 'archived']), createdAt: z.string() })
 const groupInviteSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), code: z.string().max(80), expiresAt: z.string().nullable(), maxUses: z.number().int().positive().nullable(), uses: z.number().int().min(0), revoked: z.boolean() })
 
 function mapGroupSummary(value: unknown): GroupSummary {
@@ -147,7 +148,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     return {
       userId: parsed.data.user_id,
       topicPreferences: Array.isArray(parsed.data.topic_preferences) ? parsed.data.topic_preferences.filter((item): item is string => typeof item === 'string') : [],
-      debateLanguages: Array.isArray(parsed.data.debate_languages) ? parsed.data.debate_languages.filter((item): item is 'en' | 'de' => item === 'en' || item === 'de') : ['en'],
+      debateLanguages: Array.isArray(parsed.data.debate_languages) ? parsed.data.debate_languages.filter((item): item is Language => item === 'en' || item === 'de' || item === 'fr' || item === 'es' || item === 'it') : ['en'],
       intensity: parsed.data.intensity,
       preferredMode: parsed.data.preferred_mode,
       preferredAiStyle: parsed.data.preferred_ai_style,
@@ -211,7 +212,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
       responses,
       opponentMessages,
       assignedSide: String(row.assigned_side),
-      language: row.language === 'de' ? 'de' : 'en',
+      language: row.language === 'en' || row.language === 'de' || row.language === 'fr' || row.language === 'es' || row.language === 'it' ? row.language : 'en',
       status: 'active',
       updatedAt: String(row.updated_at),
     }, 'active debate')
@@ -399,7 +400,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
 
   async function createGroup(userId: string, input: CreateGroupInput): Promise<GroupSummary> {
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to create a group.')
-    const checked = z.object({ name: z.string().trim().min(2).max(60), description: z.string().trim().max(240), rules: z.string().trim().max(600), icon: z.string().max(8), accent: z.string().max(32), language: z.enum(['en', 'de']), memberLimit: z.number().int().min(2).max(500).nullable(), leaderboardEnabled: z.boolean() }).safeParse(input)
+    const checked = z.object({ name: z.string().trim().min(2).max(60), description: z.string().trim().max(240), rules: z.string().trim().max(600), icon: z.string().max(8), accent: z.string().max(32), language: languageSchema, memberLimit: z.number().int().min(2).max(500).nullable(), leaderboardEnabled: z.boolean() }).safeParse(input)
     if (!checked.success) throw new RepositoryErrorClass('validation', 'Keep the group name, description and rules within their limits.')
     const { data, error } = await client.rpc('create_group', { p_name: checked.data.name, p_description: checked.data.description, p_rules: checked.data.rules, p_icon: checked.data.icon, p_accent: checked.data.accent, p_language: checked.data.language, p_member_limit: checked.data.memberLimit, p_leaderboard_enabled: checked.data.leaderboardEnabled })
     if (error) throw mapSupabaseError('creating your private group', error)
@@ -433,7 +434,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
 
   async function createGroupTopic(userId: string, groupId: string, input: CreateGroupTopicInput): Promise<void> {
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to add a group topic.')
-    const checked = z.object({ statement: z.string().trim().min(8).max(240), context: z.string().trim().max(600), sideLabels: z.tuple([z.string().trim().min(1).max(28), z.string().trim().min(1).max(28)]), category: z.string().trim().min(1).max(60), language: z.enum(['en', 'de']), sensitivity: z.enum(['standard', 'sensitive']) }).safeParse(input)
+    const checked = z.object({ statement: z.string().trim().min(8).max(240), context: z.string().trim().max(600), sideLabels: z.tuple([z.string().trim().min(1).max(28), z.string().trim().min(1).max(28)]), category: z.string().trim().min(1).max(60), language: languageSchema, sensitivity: z.enum(['standard', 'sensitive']) }).safeParse(input)
     if (!checked.success) throw new RepositoryErrorClass('validation', 'Keep the group topic within its limits.')
     const { error } = await client.rpc('create_group_topic', { p_group_id: groupId, p_statement: checked.data.statement, p_context: checked.data.context, p_support_label: checked.data.sideLabels[0], p_question_label: checked.data.sideLabels[1], p_category: checked.data.category, p_language: checked.data.language, p_sensitivity: checked.data.sensitivity })
     if (error) throw mapSupabaseError('saving the group topic', error)

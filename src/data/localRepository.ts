@@ -44,7 +44,7 @@ export function createLocalRepository(): AppRepository {
     async loadDebate(userId) {
       const state = cloneState()
       if (state.userId !== userId) return null
-      return state.debate ? { ...state.debate, language: state.debate.language === 'de' ? 'de' : 'en' } : null
+      return state.debate ? { ...state.debate, language: ['en', 'de', 'fr', 'es', 'it'].includes(state.debate.language) ? state.debate.language : 'en' } : null
     },
     async saveDebate(userId, debate) {
       const state = cloneState()

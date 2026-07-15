@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import sync_playwright
 
 
@@ -15,7 +17,7 @@ def main():
         if page.get_by_label("Display name").count():
             page.get_by_label("Display name").fill("Real User")
             page.get_by_role("button", name="Enter the arena").click()
-        page.get_by_text("Good morning, Real.").wait_for(timeout=10_000)
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Real\."), exact=False).wait_for(timeout=10_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()
         page.get_by_role("button", name="Start a debate", exact=True).first.click()

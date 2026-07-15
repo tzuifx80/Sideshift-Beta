@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { localizeTake } from './i18n'
 
 export type Mode = 'classic' | 'sideswitch' | 'blindside' | 'commonground'
 export type Stance = -2 | -1 | 0 | 1 | 2
-export type Language = 'en' | 'de'
+export type Language = 'en' | 'de' | 'fr' | 'es' | 'it'
 export type AiDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert'
 export type AiRoundLength = 'quick' | 'standard' | 'deep'
 export type AiQuality = 'fast' | 'balanced' | 'maximum'
@@ -124,7 +125,7 @@ export const opponentSchema = z.object({
   response: z.string().min(1).max(700),
   question: z.string().min(1).max(260),
   round: z.number().int().min(1).max(5),
-  language: z.enum(['en', 'de']),
+  language: z.enum(['en', 'de', 'fr', 'es', 'it']),
 })
 
 export const judgeSchema = z.object({
@@ -248,10 +249,8 @@ export function getTake(id: string): Take {
   return takes.find(take => take.id === id) ?? takes[0]
 }
 
-export function takeText(take: Take, language: Language): { statement: string; context: string; category: string } {
-  return language === 'de'
-    ? { statement: take.statementDe, context: take.contextDe, category: take.categoryDe }
-    : { statement: take.statement, context: take.context, category: take.category }
+export function takeText(take: Take, language: Language): { statement: string; context: string; category: string; sourceLanguage?: Language } {
+  return localizeTake(take, language)
 }
 
 export function assignSide(stance: Stance, mode: Mode, take: Take): string {

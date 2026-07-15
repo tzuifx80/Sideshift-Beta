@@ -1,4 +1,4 @@
-import type { Mode } from '../domain'
+import type { Language, Mode } from '../domain'
 import type { AiFamily, AiQuality, AiResponseLength, PreferredOpponentType } from '../lib/ai/types'
 
 export type BackendName = 'local' | 'supabase'
@@ -12,7 +12,7 @@ export type UserProfile = {
   displayName: string | null
   bio: string | null
   avatarPreset: AvatarPreset
-  interfaceLanguage: 'en' | 'de'
+  interfaceLanguage: Language
   challengeShowName: boolean
   shareRealStance: boolean
 }
@@ -20,7 +20,7 @@ export type UserProfile = {
 export type UserPreferences = {
   userId: string
   topicPreferences: string[]
-  debateLanguages: ('en' | 'de')[]
+  debateLanguages: Language[]
   intensity: string | null
   preferredMode: Mode
   preferredAiStyle: string | null

@@ -18,11 +18,11 @@ def main():
         page.goto(BASE, wait_until="domcontentloaded")
         page.wait_for_timeout(500)
 
-        page.get_by_label("Display name").or_(page.get_by_text("Good morning, Team")).first.wait_for(timeout=30_000)
+        page.get_by_label("Display name").or_(page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Team"))).first.wait_for(timeout=30_000)
         if page.get_by_label("Display name").count():
             page.get_by_label("Display name").fill("Team Facilitator")
             page.get_by_role("button", name="Enter the arena", exact=True).click()
-        page.get_by_text("Good morning, Team").wait_for(timeout=30_000)
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Team")).wait_for(timeout=30_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()
 
@@ -57,21 +57,25 @@ def main():
             raise AssertionError("Team Debate did not expose the optional voice capability state")
         for index in range(4):
             page.locator(".team-composer textarea").fill(f"This team gives a clear, respectful argument for turn {index + 1}.")
-            page.get_by_role("button", name="Submit turn", exact=True).click()
+            submit_button = page.get_by_role("button", name="Submit turn", exact=True)
+            previous_progress = page.locator(".team-progress-line span").get_attribute("style")
+            submit_button.click()
             if index < 3:
-                page.get_by_role("button", name="Submit turn", exact=True).wait_for()
-                page.wait_for_timeout(80)
-        page.get_by_text("Good work in the room.").wait_for(timeout=10_000)
+                page.wait_for_function("""(previous) => {
+                    const progress = document.querySelector('.team-progress-line span')
+                    return progress && progress.getAttribute('style') !== previous
+                }""", arg=previous_progress, timeout=10_000)
+        page.locator(".team-results-page").wait_for(timeout=30_000)
         if page.locator(".team-transcript-card article").count() != 4:
             raise AssertionError("Team transcript did not retain all four turns")
 
         page.reload(wait_until="domcontentloaded")
         page.wait_for_timeout(500)
-        page.get_by_text("Good work in the room.").wait_for(timeout=10_000)
+        page.locator(".team-results-page").wait_for(timeout=30_000)
         page.locator(".sidebar-nav").get_by_role("button", name="Groups", exact=True).click()
         page.get_by_role("heading", name="Groups.").wait_for()
         page.get_by_role("button", name=group_name, exact=False).click()
-        page.get_by_text("Constructive points", exact=True).wait_for()
+        page.locator(".group-leaderboard").wait_for()
         if page.locator(".leaderboard-row strong").first.inner_text() != "20":
             raise AssertionError("Completed group Team Debate did not award exactly one participation update")
 

@@ -37,6 +37,45 @@ const copy: Record<Language, GuideCopy> = {
       { title: 'Lade eine Person ein', body: 'Personen-Challenges sind asynchron: Sende einen privaten Link und vergleiche die Antworten später.' },
     ],
   },
+  fr: {
+    title: 'Comment fonctionne SideShift',
+    intro: 'Un court jeu de perspectives, privé. Il n’y a pas de bonne réponse à trouver.',
+    close: 'Compris',
+    next: 'Suivant',
+    back: 'Retour',
+    steps: [
+      { title: 'Choisis un point de vue', body: 'Commence par ta position sincère. SideSwitch peut te demander de défendre l’opinion inverse.' },
+      { title: 'Construis le meilleur argument', body: 'Réponds à une question précise à la fois. Ton argument reste privé, sauf si tu choisis de le partager.' },
+      { title: 'Prends du recul, puis relis', body: 'Ton évolution et ton ADN argumentatif décrivent cette conversation, pas ton intelligence ni ton identité.' },
+      { title: 'Invite quelqu’un', body: 'Les défis sont asynchrones : envoie un lien privé, puis compare les réponses.' },
+    ],
+  },
+  es: {
+    title: 'Cómo funciona SideShift',
+    intro: 'Un breve juego privado de perspectivas. No hay una respuesta correcta que descubrir.',
+    close: 'Entendido',
+    next: 'Siguiente',
+    back: 'Atrás',
+    steps: [
+      { title: 'Elige una postura', body: 'Empieza con tu opinión sincera. SideSwitch puede pedirte defender la postura contraria.' },
+      { title: 'Construye el mejor argumento', body: 'Responde una pregunta concreta cada vez. Tu argumento sigue siendo privado salvo que decidas compartirlo.' },
+      { title: 'Reflexiona y revisa', body: 'Tu cambio y tu ADN argumental describen esta conversación, no tu inteligencia ni tu identidad.' },
+      { title: 'Invita a alguien', body: 'Los desafíos son asíncronos: envía un enlace privado y compara las respuestas cuando llegue.' },
+    ],
+  },
+  it: {
+    title: 'Come funziona SideShift',
+    intro: 'Un breve gioco privato sulle prospettive. Non c’è una risposta giusta da trovare.',
+    close: 'Capito',
+    next: 'Avanti',
+    back: 'Indietro',
+    steps: [
+      { title: 'Scegli una posizione', body: 'Parti dalla tua opinione sincera. SideSwitch può chiederti di difendere il punto di vista opposto.' },
+      { title: 'Costruisci l’argomento migliore', body: 'Rispondi a una domanda mirata alla volta. Il tuo argomento resta privato, salvo tua scelta.' },
+      { title: 'Rifletti e rivedi', body: 'Il tuo cambiamento e il tuo DNA argomentativo descrivono questa conversazione, non la tua intelligenza o identità.' },
+      { title: 'Invita qualcuno', body: 'Le sfide sono asincrone: invia un link privato e confronta le risposte quando arrivano.' },
+    ],
+  },
 }
 
 export const GUIDE_SEEN_KEY = 'sideshift-guide-seen-v1'

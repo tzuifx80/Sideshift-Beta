@@ -15,13 +15,13 @@ def main():
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(BASE, wait_until="domcontentloaded")
         page.wait_for_timeout(500)
-
+        page.get_by_label("Display name").or_(page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI"))).first.wait_for(timeout=30_000)
         if page.get_by_label("Display name").count():
             page.get_by_label("Display name").fill("AI Team Facilitator")
             page.get_by_role("button", name="Ethics and Philosophy", exact=True).click()
             page.get_by_role("button", name="School and Education", exact=True).click()
             page.get_by_role("button", name="Enter the arena", exact=True).click()
-        page.get_by_text("Good morning, AI.").wait_for(timeout=10_000)
+        page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI\."), exact=False).wait_for(timeout=10_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()
 
@@ -37,7 +37,7 @@ def main():
             page.get_by_role("button", name="Submit turn", exact=True).click()
             if index == 0:
                 page.get_by_text("CURRENT TEAM", exact=True).wait_for()
-        page.get_by_text("AI-ASSISTED FEEDBACK", exact=True).wait_for(timeout=10_000)
+        page.locator(".team-ai-review .eyebrow").filter(has_text="AI feedback selected").wait_for(timeout=10_000)
         page.get_by_text("Technique, not ideology", exact=True).wait_for(timeout=10_000)
         page.locator(".team-review-grid article").first.wait_for(timeout=10_000)
         if page.locator(".team-review-grid article").count() != 2:
