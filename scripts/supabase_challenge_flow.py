@@ -329,7 +329,7 @@ def run_flow(env: dict[str, str], diagnostics_dir: Path) -> None:
             page_a.get_by_role("button", name="Agree", exact=True).last.click()
             page_a.get_by_role("button", name="Definitely").click()
             page_a.get_by_role("button", name="Show me the result").click()
-            page_a.get_by_text("The Shift Card").wait_for(timeout=PAGE_TIMEOUT_MS)
+            page_a.get_by_role("heading", name="The Shift Card").wait_for(timeout=PAGE_TIMEOUT_MS)
             page_a.get_by_role("button", name="Challenge a friend").click()
             page_a.locator("#clash-argument").fill("The strongest reason is that better defaults protect people without removing all autonomy.")
             page_a.get_by_role("button", name="Create challenge").click()

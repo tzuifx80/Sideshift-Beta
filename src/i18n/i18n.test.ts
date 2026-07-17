@@ -3,6 +3,8 @@ import { greetingKey, localeLabels, localeMessages, localizeTake, translate } fr
 import { takes } from '../domain'
 import { supportedLanguages } from './types'
 
+const activeFeatureSources = import.meta.glob('../features/**/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+
 describe('typed localization', () => {
   it('keeps all locale keys populated and in parity', () => {
     const keys = Object.keys(localeMessages.en).sort()
@@ -28,5 +30,18 @@ describe('typed localization', () => {
     const allText = JSON.stringify(localeMessages)
     expect(allText).not.toMatch(/[\u00C2\u00C3\uFFFD]|\u00E2(?:\u20AC\u2122|\u20AC\u0153|\u20AC)/)
     expect(Object.values(localeLabels)).toEqual(expect.arrayContaining(['Français', 'Español', 'Italiano']))
+  })
+
+  it('keeps active feature surfaces free of retired hard-coded English copy', () => {
+    const source = Object.values(activeFeatureSources).join('\n')
+    for (const literal of [
+      'Exit debate',
+      'Where do you actually stand?',
+      'Make your case.',
+      'Response could not be submitted.',
+      'The Shift Card',
+      'Challenge ready',
+      'Waiting for your opponent...',
+    ]) expect(source).not.toContain(literal)
   })
 })

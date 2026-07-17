@@ -1,5 +1,6 @@
 import type { ResultData, Language } from './domain'
 import { takeText } from './domain'
+import { translate } from './i18n'
 
 function wrapText(context: CanvasRenderingContext2D, value: string, maxWidth: number): string[] {
   const words = value.split(/\s+/)
@@ -37,14 +38,14 @@ export async function createShareCardBlob(result: ResultData, language: Language
   context.fillText('SideShift', 76, 92)
   context.fillStyle = '#cfc7fb'
   context.font = '700 22px Arial'
-  context.fillText('MY SHIFT', 76, 145)
+  context.fillText(translate(language, 'results.shiftCard').toUpperCase(), 76, 145)
   context.fillStyle = '#fffef9'
   context.font = '700 48px Arial'
   const statementLines = wrapText(context, `“${text.statement}”`, 980)
   statementLines.slice(0, 4).forEach((line, index) => context.fillText(line, 76, 250 + index * 62))
   context.fillStyle = '#f6d0c9'
   context.font = '700 22px Arial'
-  context.fillText('ARGUMENT SCORE', 76, 580)
+  context.fillText(translate(language, 'results.argumentScore'), 76, 580)
   context.fillStyle = '#fffef9'
   context.font = '700 118px Arial'
   context.fillText(result.score === null ? '—' : String(result.score), 76, 700)
@@ -52,8 +53,8 @@ export async function createShareCardBlob(result: ResultData, language: Language
   context.fillText('/ 100', 300, 700)
   context.fillStyle = '#cfc7fb'
   context.font = '700 22px Arial'
-  context.fillText(result.understanding === 'yes' ? 'UNDERSTANDING IS A WIN' : 'REFLECTION IS A WIN', 76, 790)
-  context.fillText('CAN YOU MOVE A MIND?', 830, 820)
+  context.fillText(translate(language, result.understanding === 'yes' ? 'results.understandingWin' : 'results.reflectionWin'), 76, 790)
+  context.fillText(translate(language, 'results.moveAMind'), 830, 820)
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Share card export failed.')), 'image/png'))
 }
 

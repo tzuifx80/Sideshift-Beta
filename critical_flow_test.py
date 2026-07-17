@@ -1,9 +1,11 @@
 import re
+from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
 
 BASE = "http://127.0.0.1:4173"
+SCREENSHOT_DIR = Path(r"C:\Users\Admin\.codex\visualizations\2026\07\17\sideshift-phase2")
 RESPONSES = [
     "Safety matters, but a hard age cut-off should be paired with better platform design and family support.",
     "The concern about hidden spaces is real, but visibility is not a reason to leave young people unprotected.",
@@ -84,6 +86,18 @@ def main():
         if page.locator("textarea").input_value() != draft_text:
             raise AssertionError("An unsent argument draft was not restored after in-app navigation")
 
+        page.locator(".language-button").click()
+        page.locator(".argument-heading h1").wait_for()
+        if page.locator("textarea").input_value() != draft_text:
+            raise AssertionError("Locale switching reset the active debate draft")
+        for _ in range(5):
+            if page.locator(".language-button").inner_text().strip().startswith("EN"):
+                break
+            page.locator(".language-button").click()
+            page.wait_for_timeout(250)
+        else:
+            raise AssertionError("Locale switching did not restore the English test state")
+
         fill_and_send(page, RESPONSES[0])
         page.locator(".argument-heading h1").wait_for()
         page.reload(wait_until="networkidle")
@@ -101,7 +115,9 @@ def main():
         page.get_by_role("button", name="Definitely").click()
         page.get_by_role("button", name="Show me the result").click()
         page.get_by_text("That was a").wait_for(timeout=10_000)
-        page.get_by_text("The Shift Card").wait_for()
+        page.get_by_role("heading", name="The Shift Card", exact=True).wait_for()
+        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(SCREENSHOT_DIR / "en-results-critical-1440.png"), full_page=True)
         score = page.locator(".result-score-hero strong").inner_text()
         if not score.isdigit() or not 0 <= int(score) <= 100:
             raise AssertionError(f"Invalid result score: {score}")
@@ -117,10 +133,11 @@ def main():
         page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Integration"), exact=False).wait_for()
 
         page.reload(wait_until="networkidle")
-        page.get_by_text("The Shift Card").wait_for()
+        page.get_by_role("heading", name="The Shift Card", exact=True).wait_for()
 
         page.get_by_role("button", name="Challenge a friend").click()
         page.get_by_role("heading", name="Make your case.").wait_for()
+        page.screenshot(path=str(SCREENSHOT_DIR / "en-clash-critical-1440.png"), full_page=True)
         page.locator("#clash-argument").fill("The strongest reason is that better defaults protect people without removing all autonomy.")
         page.get_by_role("button", name="Create challenge").click()
         page.get_by_text("Challenge ready").wait_for(timeout=10_000)
@@ -132,6 +149,7 @@ def main():
         recipient = recipient_context.new_page()
         recipient.goto(challenge_url, wait_until="networkidle")
         recipient.get_by_text("Can you answer").wait_for()
+        recipient.screenshot(path=str(SCREENSHOT_DIR / "en-clash-recipient-critical-1440.png"), full_page=True)
         recipient.get_by_text("The strongest reason is that better defaults protect people without removing all autonomy.").wait_for()
         recipient.locator("#challenge-response").fill("A thoughtful counterpoint is that autonomy also requires safe defaults and clear accountability.")
         recipient.get_by_role("button", name="Send my counter").click()

@@ -5,6 +5,9 @@ import { es } from './locales/es'
 import { fr } from './locales/fr'
 import { it } from './locales/it'
 import { phase2Messages } from './phase2'
+import { debateMessages, stanceMessages } from './debate'
+import { resultsMessages } from './results'
+import { activeAiMessages } from './aiActive'
 import { teamMessages } from './team'
 import { responseMessages } from './response'
 import { groupMessages } from './groups'
@@ -16,11 +19,11 @@ export type { TranslationKey, Translator } from './types'
 export const LOCALE_STORAGE_KEY = 'sideshift-locale-v1'
 export const localeLabels: Record<Language, string> = { en: 'English', de: 'Deutsch', fr: 'Français', es: 'Español', it: 'Italiano' }
 const locales: Record<Language, LocaleMessages> = {
-  en: Object.assign({}, en, phase2Messages.en, teamMessages.en, responseMessages.en, groupMessages.en) as LocaleMessages,
-  de: Object.assign({}, de, phase2Messages.de, teamMessages.de, responseMessages.de, groupMessages.de) as LocaleMessages,
-  fr: Object.assign({}, fr, phase2Messages.fr, teamMessages.fr, responseMessages.fr, groupMessages.fr) as LocaleMessages,
-  es: Object.assign({}, es, phase2Messages.es, teamMessages.es, responseMessages.es, groupMessages.es) as LocaleMessages,
-  it: Object.assign({}, it, phase2Messages.it, teamMessages.it, responseMessages.it, groupMessages.it) as LocaleMessages,
+  en: Object.assign({}, en, phase2Messages.en, debateMessages.en, stanceMessages.en, resultsMessages.en, activeAiMessages.en, teamMessages.en, responseMessages.en, groupMessages.en) as LocaleMessages,
+  de: Object.assign({}, de, phase2Messages.de, debateMessages.de, stanceMessages.de, resultsMessages.de, activeAiMessages.de, teamMessages.de, responseMessages.de, groupMessages.de) as LocaleMessages,
+  fr: Object.assign({}, fr, phase2Messages.fr, debateMessages.fr, stanceMessages.fr, resultsMessages.fr, activeAiMessages.fr, teamMessages.fr, responseMessages.fr, groupMessages.fr) as LocaleMessages,
+  es: Object.assign({}, es, phase2Messages.es, debateMessages.es, stanceMessages.es, resultsMessages.es, activeAiMessages.es, teamMessages.es, responseMessages.es, groupMessages.es) as LocaleMessages,
+  it: Object.assign({}, it, phase2Messages.it, debateMessages.it, stanceMessages.it, resultsMessages.it, activeAiMessages.it, teamMessages.it, responseMessages.it, groupMessages.it) as LocaleMessages,
 }
 export const localeMessages = locales
 
