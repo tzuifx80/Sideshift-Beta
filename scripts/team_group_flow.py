@@ -59,7 +59,8 @@ def main():
             page.locator(".team-composer textarea").fill(f"This team gives a clear, respectful argument for turn {index + 1}.")
             submit_button = page.get_by_role("button", name="Submit turn", exact=True)
             previous_progress = page.locator(".team-progress-line span").get_attribute("style")
-            submit_button.click()
+            with page.expect_response(lambda response: response.request.method == "POST" and "rpc/save_team_debate_session" in response.url and response.status in (200, 204), timeout=30_000):
+                submit_button.click()
             if index < 3:
                 page.wait_for_function("""(previous) => {
                     const progress = document.querySelector('.team-progress-line span')
@@ -75,9 +76,15 @@ def main():
         page.locator(".sidebar-nav").get_by_role("button", name="Groups", exact=True).click()
         page.get_by_role("heading", name="Groups.").wait_for()
         page.get_by_role("button", name=group_name, exact=False).click()
+        page.wait_for_url(re.compile(r"/group/[A-Za-z0-9-]+$"))
         page.locator(".group-leaderboard").wait_for()
         if page.locator(".leaderboard-row strong").first.inner_text() != "20":
             raise AssertionError("Completed group Team Debate did not award exactly one participation update")
+        for refresh in range(2):
+            page.reload(wait_until="domcontentloaded")
+            page.locator(".group-leaderboard").wait_for()
+            if page.locator(".leaderboard-row strong").first.inner_text() != "20":
+                raise AssertionError(f"Team Debate points changed after refresh {refresh + 1}")
 
         for width in (320, 375, 390, 768, 1280):
             page.set_viewport_size({"width": width, "height": 900})

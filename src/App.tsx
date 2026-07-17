@@ -539,6 +539,7 @@ function App() {
   }
 
   function openTeamDebate(topic?: GroupTopic | null, group?: GroupSummary) {
+    if (window.location.pathname.startsWith('/group/')) window.history.replaceState({}, '', '/')
     setActiveGroupId(group?.id || null)
     if (topic) {
       setActiveTake(privateTake(topic.statement, activeTake))
