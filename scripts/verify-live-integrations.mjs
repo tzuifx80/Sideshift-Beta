@@ -132,8 +132,12 @@ try {
   console.log('Mailbox arrival still requires the configured recipient inbox check; this command verifies provider acceptance and stored delivery status.')
 } finally {
   if (userId) {
-    await supabase.rpc('delete_my_basic_ai_usage').catch(() => undefined)
-    await supabase.rpc('delete_my_beta_data').catch(() => undefined)
+    try {
+      await supabase.rpc('delete_my_basic_ai_usage')
+    } catch { /* cleanup is best-effort */ }
+    try {
+      await supabase.rpc('delete_my_beta_data')
+    } catch { /* cleanup is best-effort */ }
   }
   server.kill()
   await rm(temporaryDir, { recursive: true, force: true })
