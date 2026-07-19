@@ -9,6 +9,7 @@ export function createMockAiProvider(options: { models?: unknown[]; response?: s
   const response = options.response || 'I can see why that point matters. The strongest counterpoint is the trade-off you accept when the same rule affects people differently. What evidence would make you revise your position?'
   const evaluation = options.evaluation || { clarity: 15, relevance: 14, reasoning: 15, rebuttal: 13, fairness: 16, strongestPoint: 'You made a clear, specific claim.', weakestAssumption: 'The main assumption could be stated more explicitly.', missedCounterargument: 'The strongest trade-off deserved one direct response.', unansweredOpponentPoint: 'The opponent’s latest trade-off still needed a direct answer.', improvedExampleResponse: 'A stronger version would name the trade-off and the evidence that would change your mind.', argumentDna: 'Clear trade-offs with room for sharper assumptions.', concession: 'none' as const }
   return {
+    kind: 'mock' as const,
     async getStatus() { return connected ? 'connected' : 'disconnected' },
     async connect() { if (options.connectError) throw normalizeAiError(options.connectError); connected = true },
     async listModels() { if (!connected) throw new AiProviderError('connection_required', 'Connect Puter before discovering AI models.'); return models },
@@ -27,6 +28,19 @@ export function createMockAiProvider(options: { models?: unknown[]; response?: s
       return { requestId, chunks, stop: () => { stopped = true } }
     },
     async evaluate(): Promise<AiEvaluation> { if (!connected) throw new AiProviderError('connection_required', 'Connect Puter before evaluating the debate.'); return evaluation },
+  }
+}
+
+export function createUnavailableAiProvider(kind: 'puter' | 'basic' = 'puter'): AiProvider {
+  const fail = async <T>(): Promise<T> => { throw new AiProviderError('provider_unavailable', kind === 'puter' ? 'Connect Puter before starting this debate.' : 'SideShift Basic is temporarily unavailable.') }
+  return {
+    kind,
+    async getStatus() { return 'failed' },
+    async connect() { await fail() },
+    async listModels() { return fail<ReturnType<AiProvider['listModels']> extends Promise<infer T> ? T : never>() },
+    async getUsage() { return null },
+    async streamChat() { return fail<ReturnType<AiProvider['streamChat']> extends Promise<infer T> ? T : never>() },
+    async evaluate() { return fail<ReturnType<AiProvider['evaluate']> extends Promise<infer T> ? T : never>() },
   }
 }
 

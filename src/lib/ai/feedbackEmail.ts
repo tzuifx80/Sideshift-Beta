@@ -1,0 +1,3 @@
+export function buildFeedbackEmailPayload(feedback: { id: string; category: string; message?: string | null; appVersion: string; language?: string; platform?: string; screen: string; aiModelId?: string | null; createdAt?: string }, now = new Date()) {
+  return { subject: `[SideShift feedback] ${feedback.category}`, text: [`Feedback ID: ${feedback.id}`, `Category: ${feedback.category}`, `Message: ${feedback.message || '(none)'}`, `App version: ${feedback.appVersion}`, `Language: ${feedback.language || 'unknown'}`, `Platform: ${feedback.platform || 'unknown'}`, `Screen: ${feedback.screen}`, `AI provider/model: ${feedback.aiModelId || 'not applicable'}`, `Timestamp: ${feedback.createdAt || now.toISOString()}`].join('\n') }
+}

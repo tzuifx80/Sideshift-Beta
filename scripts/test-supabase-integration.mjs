@@ -110,6 +110,12 @@ if (feedback.error) fail('beta feedback row lookup failed: ' + feedback.error.me
 const bFeedback = await b.client.from('beta_feedback').select('id').eq('owner_id', a.user.id)
 if (bFeedback.error) fail(`beta feedback privacy query failed: ${bFeedback.error.message}`)
 deniedRows(bFeedback.data, 'user B beta feedback')
+const usageInsert = await a.client.from('basic_ai_daily_usage').insert({ user_id: a.user.id, usage_date: new Date().toISOString().slice(0, 10) })
+deniedError(usageInsert.error, 'user A inserted Basic AI usage directly')
+const usageUpdate = await a.client.from('basic_ai_daily_usage').update({ debates_started: 99 }).eq('user_id', a.user.id)
+deniedError(usageUpdate.error, 'user A modified Basic AI usage directly')
+const usageRpc = await a.client.rpc('get_basic_ai_usage', { p_user_id: a.user.id })
+deniedError(usageRpc.error, 'authenticated client called server-only Basic AI usage RPC')
 
 const bDelete = await b.client.rpc('delete_my_beta_data')
 if (bDelete.error) fail(`user B data deletion failed: ${bDelete.error.message}`)

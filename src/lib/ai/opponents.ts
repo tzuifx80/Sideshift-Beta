@@ -7,6 +7,8 @@ export const opponents: AiOpponent[] = [
   { id: 'deepseek-challenger', displayName: 'DeepSeek — The Challenger', family: 'DeepSeek', description: 'A firm devil’s advocate who keeps the trade-off visible.', icon: '≈', stylePrompt: 'Be firm but respectful. Stress one overlooked trade-off or counterexample and vary your opening so the reply does not sound templated.', approvedModelRules: 'Current DeepSeek general chat model; do not substitute another family.', maxResponseTokens: 260 },
 ]
 
+export const basicOpponent: AiOpponent = { id: 'sideshift-basic', displayName: 'SideShift Basic', family: 'GPT', description: 'A streamlined server-provided debate opponent available without connecting another account.', icon: '✦', stylePrompt: 'Keep one main counterpoint visible, acknowledge a genuinely strong point, and avoid repeating a rebuttal that has already been answered.', approvedModelRules: 'One configured SideShift Basic server model.', maxResponseTokens: 180 }
+
 export function getOpponent(id: string): AiOpponent | undefined {
-  return opponents.find(opponent => opponent.id === id)
+  return id === basicOpponent.id ? basicOpponent : opponents.find(opponent => opponent.id === id)
 }

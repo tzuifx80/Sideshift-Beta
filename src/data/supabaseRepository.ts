@@ -328,6 +328,8 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to delete beta data.')
     const { error } = await client.rpc('delete_my_beta_data')
     if (error) throw mapSupabaseError('deleting your beta data', error)
+    const { error: usageError } = await client.rpc('delete_my_basic_ai_usage')
+    if (usageError) throw mapSupabaseError('deleting your Basic AI usage', usageError)
   }
 
   async function respondToChallenge(token: string, response: string): Promise<ChallengeResolved> {
@@ -355,12 +357,14 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (error) throw mapSupabaseError('recording AI feedback', error)
   }
 
-  async function submitBetaFeedback(userId: string, payload: BetaFeedbackInput): Promise<void> {
+  async function submitBetaFeedback(userId: string, payload: BetaFeedbackInput): Promise<string> {
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to send feedback.')
     const input = z.object({ category: z.enum(['broken', 'ai_quality', 'design_usability', 'missing_topic', 'suggestion', 'other']), message: z.string().trim().max(600).nullable().optional(), surface: z.enum(['settings', 'debate_result']), screen: z.string().trim().min(1).max(40), aiModelId: z.string().trim().max(160).nullable().optional(), appVersion: z.string().trim().min(1).max(40) }).safeParse(payload)
     if (!input.success) throw new RepositoryErrorClass('validation', 'Choose a feedback type and keep the message under 600 characters.')
-    const { error } = await client.rpc('submit_beta_feedback', { p_category: input.data.category, p_message: input.data.message || null, p_surface: input.data.surface, p_screen: input.data.screen, p_ai_model_id: input.data.aiModelId || null, p_app_version: input.data.appVersion })
+    const { data, error } = await client.rpc('submit_beta_feedback', { p_category: input.data.category, p_message: input.data.message || null, p_surface: input.data.surface, p_screen: input.data.screen, p_ai_model_id: input.data.aiModelId || null, p_app_version: input.data.appVersion })
     if (error) throw mapSupabaseError('sending beta feedback', error)
+    if (typeof data !== 'string') throw new RepositoryErrorClass('validation', 'Feedback was saved without a valid id.')
+    return data
   }
 
   async function loadTeamSession(userId: string): Promise<TeamDebateSession | null> {

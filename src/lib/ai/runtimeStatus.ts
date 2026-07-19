@@ -10,18 +10,22 @@ export function createAiRuntimeSnapshot(input: { mock: boolean; puterStatus: AiC
         : input.puterStatus === 'failed'
           ? 'puter_error'
           : 'puter_disconnected'
+  const basicServer = input.basicServerAvailable ? 'basic_available' : 'basic_unavailable'
   return {
-    primary: input.mock ? 'mock' : puter,
+    primary: input.mock ? 'mock' : input.basicServerAvailable && puter === 'puter_disconnected' ? 'basic_available' : puter,
     puter,
-    basicServer: input.basicServerAvailable ? 'basic_server_available' : 'basic_server_unavailable',
+    basicServer,
   }
 }
 
 export function aiRuntimeLabel(status: AiRuntimeStatus): string {
   switch (status) {
     case 'mock': return 'Development mock AI'
-    case 'basic_server_available': return 'Server AI available'
-    case 'basic_server_unavailable': return 'Server AI unavailable'
+    case 'basic_checking': return 'Checking Basic AI'
+    case 'basic_available': return 'SideShift Basic available'
+    case 'basic_unavailable': return 'SideShift Basic unavailable'
+    case 'basic_rate_limited': return 'SideShift Basic rate limited'
+    case 'basic_quota_exhausted': return 'SideShift Basic allowance used'
     case 'puter_disconnected': return 'Puter disconnected'
     case 'puter_connecting': return 'Puter connecting'
     case 'puter_connected': return 'Puter connected'

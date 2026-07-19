@@ -28,9 +28,12 @@ def main():
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(BASE, wait_until="networkidle")
 
-        if page.get_by_label("Display name").count():
+        if page.locator(".onboarding-page").count():
+            page.get_by_role("button", name="Continue", exact=True).click()
             page.get_by_label("Display name").fill("AI Integration Tester")
-            page.get_by_role("button", name="Enter the arena").click()
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.get_by_role("button", name="Skip for now", exact=True).click()
         page.get_by_text(re.compile(r"Good (morning|afternoon|evening), AI\."), exact=False).wait_for(timeout=10_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()

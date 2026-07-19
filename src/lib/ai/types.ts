@@ -1,6 +1,7 @@
 export type AiConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'failed'
-export type AiRuntimeStatus = 'mock' | 'basic_server_available' | 'basic_server_unavailable' | 'puter_disconnected' | 'puter_connecting' | 'puter_connected' | 'puter_error'
-export type AiRuntimeSnapshot = { primary: AiRuntimeStatus; puter: AiRuntimeStatus; basicServer: 'basic_server_available' | 'basic_server_unavailable' }
+export type AiProviderKind = 'mock' | 'basic' | 'puter'
+export type AiRuntimeStatus = 'mock' | 'basic_checking' | 'basic_available' | 'basic_unavailable' | 'basic_rate_limited' | 'basic_quota_exhausted' | 'puter_disconnected' | 'puter_connecting' | 'puter_connected' | 'puter_error'
+export type AiRuntimeSnapshot = { primary: AiRuntimeStatus; puter: AiRuntimeStatus; basicServer: 'basic_available' | 'basic_unavailable' }
 export type AiFamily = 'Gemini' | 'Claude' | 'GPT' | 'DeepSeek'
 export type AiDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert'
 export type AiRoundLength = 'quick' | 'standard' | 'deep'
@@ -48,6 +49,12 @@ export type AiUsage = {
   remaining: number | null
   allowance: number | null
   units: string | null
+  allowed?: boolean
+  debatesRemaining?: number
+  turnsRemaining?: number
+  evaluationsRemaining?: number
+  resetsAt?: string
+  reason?: 'quota_exhausted' | 'rate_limited' | 'provider_unavailable' | 'invalid_request'
 }
 
 export type AiMessage = { role: 'system' | 'user' | 'assistant'; content: string }
@@ -57,6 +64,9 @@ export type AiChatRequest = {
   messages: AiMessage[]
   maxTokens: number
   temperature?: number
+  debateId?: string
+  round?: number
+  requestId?: string
 }
 
 export type AiStream = {
@@ -81,12 +91,13 @@ export type AiEvaluation = {
 }
 
 export type AiProvider = {
+  readonly kind: AiProviderKind
   getStatus: () => Promise<AiConnectionStatus>
   connect: () => Promise<void>
   listModels: (forceRefresh?: boolean) => Promise<AiModel[]>
   getUsage: () => Promise<AiUsage | null>
   streamChat: (request: AiChatRequest) => Promise<AiStream>
-  evaluate: (messages: AiMessage[], modelId: string) => Promise<AiEvaluation>
+  evaluate: (messages: AiMessage[], modelId: string, context?: { debateId?: string; requestId?: string }) => Promise<AiEvaluation>
 }
 
 export type AiStartConfig = {

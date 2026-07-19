@@ -72,7 +72,7 @@ export type AppRepository = {
   respondToChallenge(token: string, response: string, responderId?: string): Promise<ChallengeResolved>
   submitReport(userId: string, payload: ReportInput): Promise<ReportRecord>
   recordAiFeedback(userId: string, payload: AiFeedbackInput): Promise<void>
-  submitBetaFeedback(userId: string, payload: BetaFeedbackInput): Promise<void>
+  submitBetaFeedback(userId: string, payload: BetaFeedbackInput): Promise<string>
   loadTeamSession(userId: string): Promise<TeamDebateSession | null>
   saveTeamSession(userId: string, session: TeamDebateSession | null): Promise<void>
   listGroups(userId: string): Promise<GroupSummary[]>

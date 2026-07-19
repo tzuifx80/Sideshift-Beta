@@ -18,10 +18,13 @@ def main():
         page.goto(BASE, wait_until="domcontentloaded")
         page.wait_for_timeout(500)
 
-        page.get_by_label("Display name").or_(page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Team"))).first.wait_for(timeout=30_000)
-        if page.get_by_label("Display name").count():
-            page.get_by_label("Display name").fill("Team Facilitator")
-            page.get_by_role("button", name="Enter the arena", exact=True).click()
+        page.locator(".onboarding-page, .sidebar-nav").first.wait_for(timeout=30_000)
+        if page.locator(".onboarding-page").count():
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.locator("#onboarding-name").fill("Team Facilitator")
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.get_by_role("button", name="Skip for now", exact=True).click()
         page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Team")).wait_for(timeout=30_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()

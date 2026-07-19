@@ -38,7 +38,7 @@ function boundedScore(value: unknown): number {
   return Number.isFinite(score) ? Math.max(0, Math.min(20, Math.round(score))) : 0
 }
 
-function validateEvaluation(value: unknown): AiEvaluation {
+export function validateEvaluation(value: unknown): AiEvaluation {
   if (!value || typeof value !== 'object') throw new AiProviderError('invalid_response', 'The AI review was incomplete.')
   const row = value as Record<string, unknown>
   const stringValue = (key: string) => typeof row[key] === 'string' ? String(row[key]).trim().slice(0, 800) : ''
@@ -49,6 +49,7 @@ function validateEvaluation(value: unknown): AiEvaluation {
 }
 
 export class PuterAiProvider implements AiProvider {
+  readonly kind = 'puter' as const
   private status: 'disconnected' | 'connecting' | 'connected' | 'failed' = 'disconnected'
   private models: ReturnType<typeof normalizeModels> | null = null
 
@@ -96,7 +97,7 @@ export class PuterAiProvider implements AiProvider {
     return { requestId, chunks, stop: () => { stopped = true } }
   }
 
-  async evaluate(messages: AiMessage[], modelId: string): Promise<AiEvaluation> {
+  async evaluate(messages: AiMessage[], modelId: string, _context?: { debateId?: string; requestId?: string }): Promise<AiEvaluation> {
     const puter = await loadPuter()
     if (!puter.auth.isSignedIn()) throw new AiProviderError('connection_required', 'Connect Puter before evaluating the debate.')
     try {

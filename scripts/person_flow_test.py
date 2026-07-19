@@ -14,9 +14,12 @@ def main():
         puter_requests = []
         page.on("request", lambda request: puter_requests.append(request.url) if "@heyputer" in request.url.lower() or "puter.js" in request.url.lower() else None)
         page.goto(BASE, wait_until="networkidle")
-        if page.get_by_label("Display name").count():
-            page.get_by_label("Display name").fill("Real User")
-            page.get_by_role("button", name="Enter the arena").click()
+        if page.locator(".onboarding-page").count():
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.locator("#onboarding-name").fill("Real User")
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.get_by_role("button", name="Continue", exact=True).click()
+            page.get_by_role("button", name="Skip for now", exact=True).click()
         page.get_by_text(re.compile(r"Good (morning|afternoon|evening), Real\."), exact=False).wait_for(timeout=10_000)
         if page.get_by_role("dialog").count():
             page.get_by_role("dialog").get_by_text("Got it", exact=True).click()

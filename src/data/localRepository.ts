@@ -154,9 +154,10 @@ export function createLocalRepository(): AppRepository {
       const state = cloneState()
       if (state.userId !== userId) throw new Error('The local beta data owner could not be verified.')
       const duplicate = state.betaFeedback.find(item => item.surface === payload.surface && item.category === payload.category && Date.parse(item.createdAt) > Date.now() - 20_000)
-      if (duplicate) return
+      if (duplicate) return duplicate.id
       const entry = { id: `feedback-${makeUuid()}`, category: payload.category, message: payload.message || null, surface: payload.surface, screen: payload.screen, aiModelId: payload.aiModelId || null, appVersion: payload.appVersion, createdAt: new Date().toISOString() }
       saveState({ ...state, betaFeedback: [entry, ...state.betaFeedback].slice(0, 100) })
+      return entry.id
     },
     async loadTeamSession(userId) {
       const state = cloneState()
