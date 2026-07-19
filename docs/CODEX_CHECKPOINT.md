@@ -28,7 +28,10 @@ Complete SideShift Phase 3: SideShift Basic AI, server-authoritative usage and f
 - Basic uses the bounded JSON server adapter with a controlled retry; the client preserves the provider streaming contract through its existing chunk interface.
 - The current local progress persistence is browser/device scoped rather than cross-device onboarding synchronization.
 - Build retains existing Puter CommonJS and large-chunk warnings.
+- `scripts/setup-live-providers.ps1` now writes only the ignored `.env.server.local` file through hidden prompts and preserves unrelated values.
+- `npm run verify:providers` checks server configuration, Basic capability, production mock protection, and the frontend secret scan without printing values.
+- `npm run verify:providers:live` is ready to run one authenticated Basic/evaluation/feedback smoke test after secrets are entered; mailbox arrival still needs an inbox check.
 
 ## Exact next action
 
-Configure the deployment secrets for `BASIC_AI_*` and `FEEDBACK_*`, then run the live Basic debate and feedback-delivery smoke checks.
+Run `npm run setup:providers` in an interactive PowerShell window, then run `npm run verify:providers:live` and check the configured mailbox.
