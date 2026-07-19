@@ -1,4 +1,4 @@
-import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot } from './types'
+import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
 import type { DebateSnapshot, ResultData } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupSummary, TeamDebateSession } from '../collaboration'
 
@@ -50,6 +50,21 @@ export type BetaFeedbackInput = {
   appVersion: string
 }
 
+export type ProfilePreview = {
+  profileKey: string
+  handle: string | null
+  displayName: string | null
+  bio: string | null
+  avatarPath: string | null
+  avatarPreset: UserProfile['avatarPreset']
+  profileAccent: UserProfile['profileAccent']
+  visibleStats: Partial<VisibleProfileStats>
+}
+
+export type FriendshipRecord = { id: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'removed' | 'blocked'; direction: 'incoming' | 'outgoing'; profile: ProfilePreview | null }
+export type FriendChallengeRecord = { id: string; takeId: string; mode: string; argument: string; creatorSide: string; status: 'open' | 'completed' | 'expired' | 'revoked'; expiresAt: string; response: string | null; result: { total: number } | null; direction: 'incoming' | 'outgoing'; creator: ProfilePreview | null; recipient: ProfilePreview | null }
+export type GroupFriendInvitation = { id: string; groupId: string; groupName: string; status: 'pending' | 'expired'; expiresAt: string; inviter: ProfilePreview | null }
+
 export type AppRepository = {
   backend: BackendName
   diagnostics(): RepositoryDiagnostics
@@ -57,6 +72,25 @@ export type AppRepository = {
   saveProfile(profile: UserProfile): Promise<void>
   loadPreferences(userId: string): Promise<UserPreferences | null>
   savePreferences(preferences: UserPreferences): Promise<void>
+  getPrivateProfile(userId: string): Promise<UserProfile | null>
+  lookupProfileByHandle(userId: string, handle: string): Promise<ProfilePreview | null>
+  lookupProfileByFriendCode(userId: string, code: string): Promise<ProfilePreview | null>
+  regenerateFriendCode(userId: string): Promise<string>
+  listFriendships(userId: string): Promise<FriendshipRecord[]>
+  sendFriendRequest(userId: string, profileKey: string): Promise<FriendshipRecord>
+  updateFriendRequest(userId: string, relationshipId: string, action: 'accept' | 'decline' | 'cancel' | 'remove'): Promise<FriendshipRecord | null>
+  listBlocks(userId: string): Promise<ProfilePreview[]>
+  blockUser(userId: string, profileKey: string): Promise<void>
+  unblockUser(userId: string, profileKey: string): Promise<void>
+  uploadAvatar(userId: string, file: Blob, detectedMime: string): Promise<string>
+  removeAvatar(userId: string): Promise<void>
+  getAvatarUrl(userId: string, objectPath: string): Promise<string | null>
+  createFriendChallenge(userId: string, payload: { profileKey: string; takeId: string; mode: string; creatorSide: string; argument: string }): Promise<FriendChallengeRecord>
+  listFriendChallenges(userId: string): Promise<FriendChallengeRecord[]>
+  completeFriendChallenge(userId: string, challengeId: string, response: string): Promise<FriendChallengeRecord>
+  listGroupFriendInvitations(userId: string): Promise<GroupFriendInvitation[]>
+  createGroupFriendInvitation(userId: string, groupId: string, profileKey: string): Promise<void>
+  respondGroupFriendInvitation(userId: string, invitationId: string, action: 'accept' | 'decline'): Promise<void>
   loadDebate(userId: string): Promise<DebateSnapshot | null>
   saveDebate(userId: string, debate: DebateSnapshot | null): Promise<void>
   loadResult(userId: string): Promise<ResultData | null>

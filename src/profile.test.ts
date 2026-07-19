@@ -20,4 +20,8 @@ describe('private profile and preference validation', () => {
     expect(preferences).toMatchObject({ preferredOpponentType: 'ask', preferredAiFamily: 'GPT', preferredAiModelId: null, aiQuality: 'balanced', aiResponseLength: 'standard', showModelDetails: false })
     expect(normalizePreferences({ ...preferences, preferredOpponentType: 'person', preferredAiFamily: 'Claude', aiQuality: 'maximum', aiResponseLength: 'concise', showModelDetails: true })).toMatchObject({ preferredOpponentType: 'person', preferredAiFamily: 'Claude', aiQuality: 'maximum', aiResponseLength: 'concise', showModelDetails: true })
   })
+
+  it('keeps onboarding progress bounded and server-mirrorable', () => {
+    expect(normalizePreferences({ userId: 'user-1', onboardingStage: 9, onboardingGoal: 'friends', onboardingDismissed: true })).toMatchObject({ onboardingStage: 3, onboardingGoal: 'friends', onboardingDismissed: true })
+  })
 })

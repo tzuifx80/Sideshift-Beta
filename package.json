@@ -19,6 +19,7 @@
     "verify:providers": "node --env-file-if-exists=.env --env-file-if-exists=.env.server.local scripts/verify-live-providers.mjs",
     "verify:providers:live": "node --env-file-if-exists=.env --env-file-if-exists=.env.server.local scripts/verify-live-integrations.mjs",
     "test:supabase": "node --env-file=.env scripts/test-supabase-integration.mjs",
+    "test:supabase:private-social": "node --env-file=.env scripts/test-private-social-supabase.mjs",
     "test:supabase:collaboration": "node --env-file=.env scripts/test-collaboration-supabase.mjs",
     "test:rls": "node --env-file=.env scripts/test-supabase-integration.mjs",
     "test:playwright": "python critical_flow_test.py",

@@ -2,17 +2,21 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { getTake, type DebateSnapshot, type Language, type ResultData, type Stance } from '../domain'
 import { challengeRecordSchema, debateSnapshotSchema, resultDataSchema, teamDebateSessionSchema } from './schemas'
-import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, ReportInput, ReportRecord, RepositoryError } from './repository'
+import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput, ReportRecord, RepositoryError } from './repository'
 import { RepositoryError as RepositoryErrorClass } from './repository'
-import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot } from './types'
+import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupMember, GroupRole, GroupSummary, GroupTopic, TeamDebateSession } from '../collaboration'
 
 type TableRow = Record<string, unknown>
 type SupabaseFailure = { code?: string; message?: string; details?: string }
 
 const languageSchema = z.enum(['en', 'de', 'fr', 'es', 'it'])
-const profileRowSchema = z.object({ id: z.string().uuid(), display_name: z.string().nullable(), bio: z.string().nullable(), avatar_preset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), interface_language: languageSchema, challenge_show_name: z.boolean(), share_real_stance: z.boolean() })
-const preferencesRowSchema = z.object({ user_id: z.string().uuid(), topic_preferences: z.unknown(), debate_languages: z.unknown(), intensity: z.string().nullable(), preferred_mode: z.enum(['classic', 'sideswitch', 'blindside', 'commonground']), preferred_ai_style: z.string().nullable(), preferred_opponent_type: z.enum(['ask', 'ai', 'person']).default('ask'), preferred_ai_family: z.enum(['Gemini', 'Claude', 'GPT', 'DeepSeek']).default('GPT'), preferred_opponent_id: z.string(), preferred_ai_model_id: z.string().nullable().default(null), ai_difficulty: z.enum(['beginner', 'intermediate', 'advanced', 'expert']), ai_round_length: z.enum(['quick', 'standard', 'deep']), ai_quality: z.enum(['fast', 'balanced', 'maximum']).default('balanced'), ai_response_length: z.enum(['concise', 'standard', 'detailed']).default('standard'), show_model_details: z.boolean().default(false), theme: z.enum(['system', 'light', 'dark']), accent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), reduced_motion: z.boolean(), text_size: z.enum(['compact', 'comfortable']), share_real_stance: z.boolean(), onboarding_completed: z.boolean() })
+const preferencesRowSchema = z.object({ user_id: z.string().uuid(), topic_preferences: z.unknown(), debate_languages: z.unknown(), intensity: z.string().nullable(), preferred_mode: z.enum(['classic', 'sideswitch', 'blindside', 'commonground']), preferred_ai_style: z.string().nullable(), preferred_opponent_type: z.enum(['ask', 'ai', 'person']).default('ask'), preferred_ai_family: z.enum(['Gemini', 'Claude', 'GPT', 'DeepSeek']).default('GPT'), preferred_opponent_id: z.string(), preferred_ai_model_id: z.string().nullable().default(null), ai_difficulty: z.enum(['beginner', 'intermediate', 'advanced', 'expert']), ai_round_length: z.enum(['quick', 'standard', 'deep']), ai_quality: z.enum(['fast', 'balanced', 'maximum']).default('balanced'), ai_response_length: z.enum(['concise', 'standard', 'detailed']).default('standard'), show_model_details: z.boolean().default(false), theme: z.enum(['system', 'light', 'dark']), accent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), reduced_motion: z.boolean(), text_size: z.enum(['compact', 'comfortable']), share_real_stance: z.boolean(), onboarding_completed: z.boolean(), onboarding_stage: z.number().int().min(0).max(3).default(0), onboarding_goal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']).default('reasoning'), onboarding_dismissed: z.boolean().default(false) })
+const profilePreviewSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPath: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), visibleStats: z.record(z.string(), z.boolean()) })
+const privateProfileSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), friendCode: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), avatarPath: z.string().nullable(), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), profileVisibility: z.enum(['friends', 'shared_groups', 'private']), avatarVisibility: z.enum(['friends', 'shared_groups', 'private']), visibleStats: z.record(z.string(), z.boolean()), interfaceLanguage: languageSchema, challengeShowName: z.boolean(), shareRealStance: z.boolean() })
+const friendshipSchema = z.object({ id: z.string().uuid(), status: z.enum(['pending', 'accepted', 'declined', 'cancelled', 'removed', 'blocked']), direction: z.enum(['incoming', 'outgoing']), profile: profilePreviewSchema.nullable() })
+const friendChallengeSchema = z.object({ id: z.string().uuid(), takeId: z.string(), mode: z.string(), argument: z.string(), creatorSide: z.string(), status: z.enum(['open', 'completed', 'expired', 'revoked']), expiresAt: z.string(), response: z.string().nullable(), result: z.object({ total: z.number() }).nullable(), direction: z.enum(['incoming', 'outgoing']), creator: profilePreviewSchema.nullable(), recipient: profilePreviewSchema.nullable() })
+const groupFriendInvitationSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), groupName: z.string(), status: z.enum(['pending', 'expired']), expiresAt: z.string(), inviter: profilePreviewSchema.nullable() })
 const reportRowSchema = z.object({ id: z.string(), status: z.string(), created_at: z.string() })
 
 function asRow(value: unknown): TableRow {
@@ -93,6 +97,43 @@ function mapReport(value: unknown): ReportRecord {
   return { id: parsed.data.id, status: parsed.data.status, createdAt: parsed.data.created_at }
 }
 
+function mapVisibleStats(value: unknown): VisibleProfileStats {
+  const row = asRow(value)
+  return { debates: row.debates !== false, sideSwitches: row.sideSwitches !== false, constructive: row.constructive !== false, argumentDna: row.argumentDna === true }
+}
+
+function mapProfilePreview(value: unknown): ProfilePreview | null {
+  if (value === null || value === undefined) return null
+  const parsed = profilePreviewSchema.safeParse(value)
+  if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid profile preview data.')
+  return parsed.data
+}
+
+function mapPrivateProfile(userId: string, value: unknown): UserProfile | null {
+  if (value === null || value === undefined) return null
+  const parsed = privateProfileSchema.safeParse(value)
+  if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid private profile data.')
+  return { id: userId, displayName: parsed.data.displayName, bio: parsed.data.bio, avatarPreset: parsed.data.avatarPreset, interfaceLanguage: parsed.data.interfaceLanguage, challengeShowName: parsed.data.challengeShowName, shareRealStance: parsed.data.shareRealStance, publicProfileKey: parsed.data.profileKey, handle: parsed.data.handle, friendCode: parsed.data.friendCode, avatarPath: parsed.data.avatarPath, profileAccent: parsed.data.profileAccent, profileVisibility: parsed.data.profileVisibility, avatarVisibility: parsed.data.avatarVisibility, visibleStats: mapVisibleStats(parsed.data.visibleStats) }
+}
+
+function mapFriendship(value: unknown): FriendshipRecord {
+  const parsed = friendshipSchema.safeParse(value)
+  if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid friendship data.')
+  return { ...parsed.data, profile: mapProfilePreview(parsed.data.profile) }
+}
+
+function mapFriendChallenge(value: unknown): FriendChallengeRecord {
+  const parsed = friendChallengeSchema.safeParse(value)
+  if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid friend challenge data.')
+  return { ...parsed.data, creator: mapProfilePreview(parsed.data.creator), recipient: mapProfilePreview(parsed.data.recipient) }
+}
+
+function mapGroupFriendInvitation(value: unknown): GroupFriendInvitation {
+  const parsed = groupFriendInvitationSchema.safeParse(value)
+  if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid Group invitation data.')
+  return { ...parsed.data, inviter: mapProfilePreview(parsed.data.inviter) }
+}
+
 const groupSummarySchema = z.object({ id: z.string().uuid(), name: z.string().min(1).max(60), description: z.string().max(240), icon: z.string().max(8), accent: z.string().max(32), language: languageSchema, role: z.enum(['owner', 'moderator', 'member']), memberCount: z.number().int().min(0), leaderboardEnabled: z.boolean(), updatedAt: z.string() })
 const groupMemberSchema = z.object({ userId: z.string().uuid(), displayName: z.string().min(1).max(80), role: z.enum(['owner', 'moderator', 'member']), points: z.number().int().min(0), debatesCompleted: z.number().int().min(0), constructive: z.boolean() })
 const groupTopicSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), statement: z.string().min(8).max(240), context: z.string().max(600), sideLabels: z.tuple([z.string().min(1).max(28), z.string().min(1).max(28)]), category: z.string().min(1).max(60), language: languageSchema, sensitivity: z.enum(['standard', 'sensitive']), creatorId: z.string().uuid(), status: z.enum(['approved', 'pending', 'archived']), createdAt: z.string() })
@@ -126,21 +167,18 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
   const saveQueues = new Map<string, Promise<void>>()
 
   async function loadProfile(userId: string): Promise<UserProfile | null> {
-    const { data, error } = await client.from('profiles').select('id,display_name,bio,avatar_preset,interface_language,challenge_show_name,share_real_stance').eq('id', userId).maybeSingle()
+    const { data, error } = await client.rpc('get_my_private_profile')
     if (error) throw mapSupabaseError('loading your profile', error)
-    if (!data) return null
-    const parsed = profileRowSchema.safeParse(data)
-    if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid profile data.')
-    return { id: parsed.data.id, displayName: parsed.data.display_name, bio: parsed.data.bio, avatarPreset: parsed.data.avatar_preset, interfaceLanguage: parsed.data.interface_language, challengeShowName: parsed.data.challenge_show_name, shareRealStance: parsed.data.share_real_stance }
+    return mapPrivateProfile(userId, data)
   }
 
   async function saveProfile(profile: UserProfile): Promise<void> {
-    const { error } = await client.from('profiles').upsert({ id: profile.id, display_name: profile.displayName, bio: profile.bio, avatar_preset: profile.avatarPreset, interface_language: profile.interfaceLanguage, challenge_show_name: profile.challengeShowName, share_real_stance: profile.shareRealStance }, { onConflict: 'id' })
+    const { error } = await client.rpc('update_my_profile', { p_display_name: profile.displayName, p_bio: profile.bio, p_avatar_preset: profile.avatarPreset, p_interface_language: profile.interfaceLanguage, p_challenge_show_name: profile.challengeShowName, p_share_real_stance: profile.shareRealStance, p_handle: profile.handle, p_profile_accent: profile.profileAccent, p_profile_visibility: profile.profileVisibility, p_avatar_visibility: profile.avatarVisibility, p_visible_stats: profile.visibleStats })
     if (error) throw mapSupabaseError('saving your profile', error)
   }
 
   async function loadPreferences(userId: string): Promise<UserPreferences | null> {
-    const { data, error } = await client.from('user_preferences').select('user_id,topic_preferences,debate_languages,intensity,preferred_mode,preferred_ai_style,preferred_opponent_type,preferred_ai_family,preferred_opponent_id,preferred_ai_model_id,ai_difficulty,ai_round_length,ai_quality,ai_response_length,show_model_details,theme,accent,reduced_motion,text_size,share_real_stance,onboarding_completed').eq('user_id', userId).maybeSingle()
+    const { data, error } = await client.from('user_preferences').select('user_id,topic_preferences,debate_languages,intensity,preferred_mode,preferred_ai_style,preferred_opponent_type,preferred_ai_family,preferred_opponent_id,preferred_ai_model_id,ai_difficulty,ai_round_length,ai_quality,ai_response_length,show_model_details,theme,accent,reduced_motion,text_size,share_real_stance,onboarding_completed,onboarding_stage,onboarding_goal,onboarding_dismissed').eq('user_id', userId).maybeSingle()
     if (error) throw mapSupabaseError('loading your preferences', error)
     if (!data) return null
     const parsed = preferencesRowSchema.safeParse(data)
@@ -167,12 +205,141 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
       textSize: parsed.data.text_size,
       shareRealStance: parsed.data.share_real_stance,
       onboardingCompleted: parsed.data.onboarding_completed,
+      onboardingStage: parsed.data.onboarding_stage,
+      onboardingGoal: parsed.data.onboarding_goal,
+      onboardingDismissed: parsed.data.onboarding_dismissed,
     }
   }
 
   async function savePreferences(preferences: UserPreferences): Promise<void> {
-    const { error } = await client.from('user_preferences').upsert({ user_id: preferences.userId, topic_preferences: preferences.topicPreferences, debate_languages: preferences.debateLanguages, intensity: preferences.intensity, preferred_mode: preferences.preferredMode, preferred_ai_style: preferences.preferredAiStyle, preferred_opponent_type: preferences.preferredOpponentType, preferred_ai_family: preferences.preferredAiFamily, preferred_opponent_id: preferences.preferredOpponentId, preferred_ai_model_id: preferences.preferredAiModelId, ai_difficulty: preferences.aiDifficulty, ai_round_length: preferences.aiRoundLength, ai_quality: preferences.aiQuality, ai_response_length: preferences.aiResponseLength, show_model_details: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reduced_motion: preferences.reducedMotion, text_size: preferences.textSize, share_real_stance: preferences.shareRealStance, onboarding_completed: preferences.onboardingCompleted }, { onConflict: 'user_id' })
+    const { error } = await client.from('user_preferences').upsert({ user_id: preferences.userId, topic_preferences: preferences.topicPreferences, debate_languages: preferences.debateLanguages, intensity: preferences.intensity, preferred_mode: preferences.preferredMode, preferred_ai_style: preferences.preferredAiStyle, preferred_opponent_type: preferences.preferredOpponentType, preferred_ai_family: preferences.preferredAiFamily, preferred_opponent_id: preferences.preferredOpponentId, preferred_ai_model_id: preferences.preferredAiModelId, ai_difficulty: preferences.aiDifficulty, ai_round_length: preferences.aiRoundLength, ai_quality: preferences.aiQuality, ai_response_length: preferences.aiResponseLength, show_model_details: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reduced_motion: preferences.reducedMotion, text_size: preferences.textSize, share_real_stance: preferences.shareRealStance, onboarding_completed: preferences.onboardingCompleted, onboarding_stage: preferences.onboardingStage, onboarding_goal: preferences.onboardingGoal, onboarding_dismissed: preferences.onboardingDismissed }, { onConflict: 'user_id' })
     if (error) throw mapSupabaseError('saving your preferences', error)
+  }
+
+  async function getPrivateProfile(userId: string): Promise<UserProfile | null> {
+    return loadProfile(userId)
+  }
+
+  async function lookupProfileByHandle(_userId: string, handle: string): Promise<ProfilePreview | null> {
+    const { data, error } = await client.rpc('lookup_profile_by_handle', { p_handle: handle })
+    if (error) throw mapSupabaseError('looking up that handle', error)
+    return mapProfilePreview(data)
+  }
+
+  async function lookupProfileByFriendCode(_userId: string, code: string): Promise<ProfilePreview | null> {
+    const { data, error } = await client.rpc('lookup_profile_by_friend_code', { p_code: code })
+    if (error) throw mapSupabaseError('looking up that friend code', error)
+    return mapProfilePreview(data)
+  }
+
+  async function regenerateFriendCode(_userId: string): Promise<string> {
+    const { data, error } = await client.rpc('regenerate_friend_code')
+    if (error) throw mapSupabaseError('regenerating your friend code', error)
+    const code = asRow(data).friendCode
+    if (typeof code !== 'string') throw new RepositoryErrorClass('validation', 'Supabase returned an invalid friend code.')
+    return code
+  }
+
+  async function listFriendships(_userId: string): Promise<FriendshipRecord[]> {
+    const { data, error } = await client.rpc('list_my_friendships')
+    if (error) throw mapSupabaseError('loading your friends', error)
+    if (!Array.isArray(data)) throw new RepositoryErrorClass('validation', 'Supabase returned invalid friendship data.')
+    return data.map(mapFriendship)
+  }
+
+  async function sendFriendRequest(_userId: string, profileKey: string): Promise<FriendshipRecord> {
+    const { data, error } = await client.rpc('send_friend_request', { p_target_profile_key: profileKey })
+    if (error) throw mapSupabaseError('sending the friend request', error)
+    return mapFriendship(data)
+  }
+
+  async function updateFriendRequest(_userId: string, relationshipId: string, action: 'accept' | 'decline' | 'cancel' | 'remove'): Promise<FriendshipRecord | null> {
+    const { data, error } = await client.rpc('update_friend_request', { p_relationship_id: relationshipId, p_action: action })
+    if (error) throw mapSupabaseError('updating that friend request', error)
+    return mapFriendship(data)
+  }
+
+  async function listBlocks(_userId: string): Promise<ProfilePreview[]> {
+    const { data, error } = await client.rpc('list_my_blocks')
+    if (error) throw mapSupabaseError('loading blocked users', error)
+    if (!Array.isArray(data)) throw new RepositoryErrorClass('validation', 'Supabase returned invalid blocked-user data.')
+    return data.map(item => mapProfilePreview(item)).filter((item): item is ProfilePreview => Boolean(item))
+  }
+
+  async function blockUser(_userId: string, profileKey: string): Promise<void> {
+    const { error } = await client.rpc('block_user', { p_target_profile_key: profileKey })
+    if (error) throw mapSupabaseError('blocking that user', error)
+  }
+
+  async function unblockUser(_userId: string, profileKey: string): Promise<void> {
+    const { error } = await client.rpc('unblock_user', { p_target_profile_key: profileKey })
+    if (error) throw mapSupabaseError('unblocking that user', error)
+  }
+
+  async function uploadAvatar(userId: string, file: Blob, detectedMime: string): Promise<string> {
+    const profile = await getPrivateProfile(userId)
+    if (!profile?.publicProfileKey) throw new RepositoryErrorClass('not_found', 'Your private profile is not ready yet.')
+    const objectPath = `${profile.publicProfileKey}/current.webp`
+    const upload = await client.storage.from('profile-avatars').upload(objectPath, file, { contentType: detectedMime, upsert: true, cacheControl: '300' })
+    if (upload.error) throw mapSupabaseError('uploading your profile photo', upload.error)
+    const { error } = await client.rpc('set_my_avatar_path', { p_object_path: objectPath, p_mime_type: detectedMime, p_byte_size: file.size })
+    if (error) {
+      await client.storage.from('profile-avatars').remove([objectPath])
+      throw mapSupabaseError('saving your profile photo', error)
+    }
+    return objectPath
+  }
+
+  async function removeAvatar(userId: string): Promise<void> {
+    const profile = await getPrivateProfile(userId)
+    if (profile?.avatarPath) {
+      const removed = await client.storage.from('profile-avatars').remove([profile.avatarPath])
+      if (removed.error) throw mapSupabaseError('removing your profile photo', removed.error)
+    }
+    const { error } = await client.rpc('remove_my_avatar')
+    if (error) throw mapSupabaseError('removing your profile photo', error)
+  }
+
+  async function getAvatarUrl(_userId: string, objectPath: string): Promise<string | null> {
+    const { data, error } = await client.storage.from('profile-avatars').createSignedUrl(objectPath, 300)
+    if (error) throw mapSupabaseError('loading a private profile photo', error)
+    return data?.signedUrl || null
+  }
+
+  async function createFriendChallenge(_userId: string, payload: { profileKey: string; takeId: string; mode: string; creatorSide: string; argument: string }): Promise<FriendChallengeRecord> {
+    const { data, error } = await client.rpc('create_friend_challenge', { p_recipient_profile_key: payload.profileKey, p_take_id: payload.takeId, p_mode: payload.mode, p_creator_side: payload.creatorSide, p_creator_argument: payload.argument })
+    if (error) throw mapSupabaseError('creating the friend challenge', error)
+    return mapFriendChallenge({ ...asRow(data), direction: 'outgoing', creator: null, recipient: null, response: null, result: null })
+  }
+
+  async function listFriendChallenges(_userId: string): Promise<FriendChallengeRecord[]> {
+    const { data, error } = await client.rpc('list_my_friend_challenges')
+    if (error) throw mapSupabaseError('loading friend challenges', error)
+    if (!Array.isArray(data)) throw new RepositoryErrorClass('validation', 'Supabase returned invalid friend challenge data.')
+    return data.map(mapFriendChallenge)
+  }
+
+  async function completeFriendChallenge(_userId: string, challengeId: string, response: string): Promise<FriendChallengeRecord> {
+    const { data, error } = await client.rpc('complete_friend_challenge', { p_challenge_id: challengeId, p_response_content: response })
+    if (error) throw mapSupabaseError('answering the friend challenge', error)
+    return mapFriendChallenge({ ...asRow(data), direction: 'incoming', creator: null, recipient: null, expiresAt: new Date().toISOString(), response, result: asRow(data).result || null })
+  }
+
+  async function listGroupFriendInvitations(_userId: string): Promise<GroupFriendInvitation[]> {
+    const { data, error } = await client.rpc('list_my_group_invitations')
+    if (error) throw mapSupabaseError('loading Group invitations', error)
+    if (!Array.isArray(data)) throw new RepositoryErrorClass('validation', 'Supabase returned invalid Group invitation data.')
+    return data.map(mapGroupFriendInvitation)
+  }
+
+  async function createGroupFriendInvitation(_userId: string, groupId: string, profileKey: string): Promise<void> {
+    const { error } = await client.rpc('create_group_friend_invitation', { p_group_id: groupId, p_invitee_profile_key: profileKey })
+    if (error) throw mapSupabaseError('creating the Group invitation', error)
+  }
+
+  async function respondGroupFriendInvitation(_userId: string, invitationId: string, action: 'accept' | 'decline'): Promise<void> {
+    const { error } = await client.rpc('respond_group_friend_invitation', { p_invitation_id: invitationId, p_action: action })
+    if (error) throw mapSupabaseError('responding to the Group invitation', error)
   }
 
   async function loadDebate(userId: string): Promise<DebateSnapshot | null> {
@@ -326,6 +493,11 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
 
   async function deleteMyBetaData(userId: string): Promise<void> {
     if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to delete beta data.')
+    const profile = await getPrivateProfile(userId)
+    if (profile?.avatarPath) {
+      const removed = await client.storage.from('profile-avatars').remove([profile.avatarPath])
+      if (removed.error) throw mapSupabaseError('removing your profile photo', removed.error)
+    }
     const { error } = await client.rpc('delete_my_beta_data')
     if (error) throw mapSupabaseError('deleting your beta data', error)
     const { error: usageError } = await client.rpc('delete_my_basic_ai_usage')
@@ -450,5 +622,5 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (error) throw mapSupabaseError('recording group participation', error)
   }
 
-  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation }
+  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation }
 }

@@ -1,5 +1,5 @@
 import { clearState, loadState, saveState, type PersistedState } from '../storage'
-import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, ReportInput } from './repository'
+import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput } from './repository'
 import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot } from './types'
 import { makeUuid } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupRole, GroupSummary } from '../collaboration'
@@ -26,7 +26,7 @@ export function createLocalRepository(): AppRepository {
     async loadProfile(userId) {
       const state = cloneState()
       if (state.userId !== userId) return null
-      return { id: state.userId, displayName: state.name || null, bio: state.bio || null, avatarPreset: state.avatarPreset, interfaceLanguage: state.language, challengeShowName: state.challengeShowName, shareRealStance: state.shareRealStance }
+      return { id: state.userId, displayName: state.name || null, bio: state.bio || null, avatarPreset: state.avatarPreset, interfaceLanguage: state.language, challengeShowName: state.challengeShowName, shareRealStance: state.shareRealStance, publicProfileKey: null, handle: null, friendCode: null, avatarPath: null, profileAccent: state.accent, profileVisibility: 'private', avatarVisibility: 'private', visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false } }
     },
     async saveProfile(profile) {
       const state = cloneState()
@@ -35,12 +35,31 @@ export function createLocalRepository(): AppRepository {
     async loadPreferences(userId) {
       const state = cloneState()
       if (state.userId !== userId) return null
-      return { userId, topicPreferences: state.interests, debateLanguages: [state.debateLanguage], intensity: state.intensity, preferredMode: state.preferredMode, preferredAiStyle: state.preferredAiStyle, preferredOpponentType: state.preferredOpponentType, preferredAiFamily: state.preferredAiFamily, preferredOpponentId: state.preferredOpponentId, preferredAiModelId: state.preferredAiModelId, aiDifficulty: state.aiDifficulty, aiRoundLength: state.aiRoundLength, aiQuality: state.aiQuality, aiResponseLength: state.aiResponseLength, showModelDetails: state.showModelDetails, theme: state.theme, accent: state.accent, reducedMotion: state.reducedMotion, textSize: state.textSize, shareRealStance: state.shareRealStance, onboardingCompleted: state.onboarded }
+      return { userId, topicPreferences: state.interests, debateLanguages: [state.debateLanguage], intensity: state.intensity, preferredMode: state.preferredMode, preferredAiStyle: state.preferredAiStyle, preferredOpponentType: state.preferredOpponentType, preferredAiFamily: state.preferredAiFamily, preferredOpponentId: state.preferredOpponentId, preferredAiModelId: state.preferredAiModelId, aiDifficulty: state.aiDifficulty, aiRoundLength: state.aiRoundLength, aiQuality: state.aiQuality, aiResponseLength: state.aiResponseLength, showModelDetails: state.showModelDetails, theme: state.theme, accent: state.accent, reducedMotion: state.reducedMotion, textSize: state.textSize, shareRealStance: state.shareRealStance, onboardingCompleted: state.onboarded, onboardingStage: state.onboarded ? 3 : 0, onboardingGoal: 'reasoning', onboardingDismissed: false }
     },
     async savePreferences(preferences) {
       const state = cloneState()
       saveState({ ...state, userId: preferences.userId, interests: preferences.topicPreferences, onboarded: preferences.onboardingCompleted, debateLanguage: preferences.debateLanguages[0] || state.debateLanguage, intensity: preferences.intensity || state.intensity, preferredMode: preferences.preferredMode, preferredAiStyle: preferences.preferredAiStyle || state.preferredAiStyle, preferredOpponentType: preferences.preferredOpponentType, preferredAiFamily: preferences.preferredAiFamily, preferredOpponentId: preferences.preferredOpponentId, preferredAiModelId: preferences.preferredAiModelId, aiDifficulty: preferences.aiDifficulty, aiRoundLength: preferences.aiRoundLength, aiQuality: preferences.aiQuality, aiResponseLength: preferences.aiResponseLength, showModelDetails: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reducedMotion: preferences.reducedMotion, textSize: preferences.textSize, shareRealStance: preferences.shareRealStance })
     },
+    async getPrivateProfile() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async lookupProfileByHandle() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async lookupProfileByFriendCode() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async regenerateFriendCode() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async listFriendships(): Promise<FriendshipRecord[]> { return [] },
+    async sendFriendRequest() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async updateFriendRequest() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async listBlocks(): Promise<ProfilePreview[]> { return [] },
+    async blockUser() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async unblockUser() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async uploadAvatar() { throw new Error('Profile photos are available only with authenticated Supabase persistence.') },
+    async removeAvatar() { throw new Error('Profile photos are available only with authenticated Supabase persistence.') },
+    async getAvatarUrl() { return null },
+    async createFriendChallenge() { throw new Error('Friend challenges are available only with authenticated Supabase persistence.') },
+    async listFriendChallenges(): Promise<FriendChallengeRecord[]> { return [] },
+    async completeFriendChallenge() { throw new Error('Friend challenges are available only with authenticated Supabase persistence.') },
+    async listGroupFriendInvitations(): Promise<GroupFriendInvitation[]> { return [] },
+    async createGroupFriendInvitation() { throw new Error('Friend invitations are available only with authenticated Supabase persistence.') },
+    async respondGroupFriendInvitation() { throw new Error('Friend invitations are available only with authenticated Supabase persistence.') },
     async loadDebate(userId) {
       const state = cloneState()
       if (state.userId !== userId) return null

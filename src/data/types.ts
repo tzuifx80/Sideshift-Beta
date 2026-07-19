@@ -6,6 +6,8 @@ export type AvatarPreset = 'orbit' | 'spark' | 'wave' | 'sun' | 'leaf'
 export type AppearanceTheme = 'system' | 'light' | 'dark'
 export type AccentTheme = 'violet' | 'cyan' | 'amber' | 'coral' | 'mint' | 'neutral'
 export type TextSize = 'compact' | 'comfortable'
+export type ProfileVisibility = 'friends' | 'shared_groups' | 'private'
+export type VisibleProfileStats = { debates: boolean; sideSwitches: boolean; constructive: boolean; argumentDna: boolean }
 
 export type UserProfile = {
   id: string
@@ -15,6 +17,14 @@ export type UserProfile = {
   interfaceLanguage: Language
   challengeShowName: boolean
   shareRealStance: boolean
+  publicProfileKey: string | null
+  handle: string | null
+  friendCode: string | null
+  avatarPath: string | null
+  profileAccent: AccentTheme
+  profileVisibility: ProfileVisibility
+  avatarVisibility: ProfileVisibility
+  visibleStats: VisibleProfileStats
 }
 
 export type UserPreferences = {
@@ -39,6 +49,9 @@ export type UserPreferences = {
   textSize: TextSize
   shareRealStance: boolean
   onboardingCompleted: boolean
+  onboardingStage: number
+  onboardingGoal: 'reasoning' | 'school' | 'friends' | 'perspectives' | 'fun'
+  onboardingDismissed: boolean
 }
 
 export type UserStatsSnapshot = {

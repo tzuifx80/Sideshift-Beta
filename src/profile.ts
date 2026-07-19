@@ -12,6 +12,14 @@ export const userProfileSchema = z.object({
   interfaceLanguage: z.enum(['en', 'de', 'fr', 'es', 'it']),
   challengeShowName: z.boolean(),
   shareRealStance: z.boolean(),
+  publicProfileKey: z.string().uuid().nullable(),
+  handle: z.string().regex(/^[a-z0-9_]{3,24}$/).nullable(),
+  friendCode: z.string().regex(/^SS-[A-Z2-9]{10}$/).nullable(),
+  avatarPath: z.string().nullable(),
+  profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']),
+  profileVisibility: z.enum(['friends', 'shared_groups', 'private']),
+  avatarVisibility: z.enum(['friends', 'shared_groups', 'private']),
+  visibleStats: z.object({ debates: z.boolean(), sideSwitches: z.boolean(), constructive: z.boolean(), argumentDna: z.boolean() }),
 })
 
 export const userPreferencesSchema = z.object({
@@ -36,6 +44,9 @@ export const userPreferencesSchema = z.object({
   textSize: z.enum(['compact', 'comfortable']),
   shareRealStance: z.boolean(),
   onboardingCompleted: z.boolean(),
+  onboardingStage: z.number().int().min(0).max(3),
+  onboardingGoal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']),
+  onboardingDismissed: z.boolean(),
 })
 
 export function normalizeProfile(profile: Partial<UserProfile> & Pick<UserProfile, 'id'>): UserProfile {
@@ -47,6 +58,14 @@ export function normalizeProfile(profile: Partial<UserProfile> & Pick<UserProfil
     interfaceLanguage: profile.interfaceLanguage || 'en',
     challengeShowName: profile.challengeShowName === true,
     shareRealStance: profile.shareRealStance === true,
+    publicProfileKey: profile.publicProfileKey || null,
+    handle: profile.handle || null,
+    friendCode: profile.friendCode || null,
+    avatarPath: profile.avatarPath || null,
+    profileAccent: profile.profileAccent || 'coral',
+    profileVisibility: profile.profileVisibility || 'friends',
+    avatarVisibility: profile.avatarVisibility || 'private',
+    visibleStats: profile.visibleStats || { debates: true, sideSwitches: true, constructive: true, argumentDna: false },
   })
 }
 
@@ -73,6 +92,9 @@ export function normalizePreferences(preferences: Partial<UserPreferences> & Pic
     textSize: preferences.textSize || 'comfortable',
     shareRealStance: preferences.shareRealStance === true,
     onboardingCompleted: preferences.onboardingCompleted === true,
+    onboardingStage: Math.max(0, Math.min(3, Number(preferences.onboardingStage) || 0)),
+    onboardingGoal: preferences.onboardingGoal || 'reasoning',
+    onboardingDismissed: preferences.onboardingDismissed === true,
   })
 }
 

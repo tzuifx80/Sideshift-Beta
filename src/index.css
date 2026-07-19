@@ -114,6 +114,36 @@ h1 em, h2 em, h3 em { font-style: normal; color: var(--coral); }
   .topbar-actions { gap: 4px; }.language-button { padding-left: 2px; padding-right: 2px; }.icon-button { border: 0; }.top-avatar { margin-left: 3px; }.page-heading { align-items: flex-start; flex-direction: column; margin-bottom: 27px; }.page-heading h1 { font-size: 36px; }.heading-actions { width: 100%; }.heading-actions .button { margin-left: auto; }.world-card { grid-template-columns: 1fr; }.world-card-main { min-height: 315px; }.world-card-art { min-height: 220px; }.world-card-art .art-word { font-size: 40px; }.signal-card { min-height: auto; }.take-row, .recent-grid, .explore-grid { grid-template-columns: 1fr; }.take-row .take-card:last-child { display: flex; }.mini-stats { grid-column: auto; }.take-card { min-height: 150px; }.explore-grid .take-card { min-height: 160px; }.filter-filter { margin-left: 0; width: 100%; justify-content: flex-start; padding: 8px 0; }.explore-count { align-self: flex-start; }.debate-progress { width: 145px; }.debate-progress > span { display: none; }.debate-top { height: 62px; }.debate-top .report-button { font-size: 0; }.debate-top .report-button svg { margin: 0; }.debate-page { margin: -33px -20px -90px; }.debate-layout { padding-top: 21px; }.debate-sidebar h2 { max-width: 420px; margin-top: 14px; font-size: 19px; }.stage-panel h1 { font-size: 35px; }.stance-scale { gap: 4px; }.stance-option { min-height: 59px; padding: 4px; font-size: 9px; text-align: center; }.confidence-row { flex-wrap: wrap; gap: 10px; }.confidence-label { margin-left: 0; width: 100%; }.argument-heading { display: block; }.turn-badge { margin-top: 14px; }.opponent-message { margin-top: 22px; }.response-box textarea { min-height: 150px; }.argument-footer span:last-child { display: none; }.post-compare { gap: 6px; padding: 11px; }.post-compare strong { font-size: 12px; }.post-compare small { font-size: 9px; }.understanding-options { flex-wrap: wrap; }.results-intro { align-items: flex-start; flex-direction: column-reverse; gap: 28px; }.result-score-hero { align-self: flex-start; }.score-row { grid-template-columns: 1fr 80px 32px; gap: 10px; }.score-label span { font-size: 9px; }.score-breakdown { padding: 18px 16px; }.movement-card { padding: 18px 16px; }.result-lower { margin-top: 34px; }.shift-card { padding: 21px 19px 17px; min-height: 330px; }.shift-card-statement { font-size: 21px; }.shift-card-data { grid-template-columns: 1fr 1fr; gap: 16px; }.shift-card-data div:last-child { grid-column: span 2; }.shift-card-footer { left: 19px; right: 19px; }.share-actions { flex-direction: column; }.next-move { margin-top: 16px; }.clash-layout { grid-template-columns: 1fr; gap: 31px; }.clash-copy h1 { font-size: 55px; }.clash-form { padding: 18px; }.created-challenge h1 { font-size: 40px; }.generated-link { align-items: stretch; flex-direction: column; }.generated-link button { justify-content: center; }.preview-footer { flex-wrap: wrap; }.profile-grid { grid-template-columns: 1fr; }.profile-footer { align-items: flex-start; flex-direction: column; gap: 16px; }.dna-chart { justify-content: center; }.onboarding-page { padding: 22px 20px 40px; }.onboarding-layout { grid-template-columns: 1fr; gap: 35px; min-height: auto; padding-top: 80px; }.onboarding-copy h1 { font-size: 62px; letter-spacing: -3px; }.onboarding-lede { margin-top: 20px; font-size: 13px; }.onboarding-proof { margin-top: 24px; }.onboarding-card { padding: 22px 19px 19px; }.onboarding-meta { font-size: 9px; }.onboarding-orbit { opacity: .45; }
 }
 
+.friends-page { max-width: 980px; }
+.friends-profile { display: grid; grid-template-columns: 1fr minmax(220px, 280px); gap: 24px; align-items: center; margin-bottom: 20px; }
+.friends-profile p { max-width: 520px; }
+.friend-code-box { border: 1px solid var(--line); border-radius: 16px; padding: 16px; background: var(--canvas); }
+.friend-code-box strong { display: block; margin: 8px 0 12px; font-size: 1.3rem; letter-spacing: .12em; }
+.friend-code-box .text-link + .text-link { margin-left: 12px; }
+.friends-lookup-row { display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; align-items: end; }
+.friend-preview { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid var(--line); }
+.friend-preview > div:nth-child(2) { min-width: 0; flex: 1; }
+.friend-preview strong, .friend-preview small { display: block; }
+.friend-preview small { color: var(--ink-muted); margin-top: 3px; }
+.friend-preview p { margin: 5px 0 0; color: var(--ink-muted); font-size: .9rem; }
+.friends-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; overflow: hidden; border-radius: 50%; background: var(--coral-soft); color: var(--coral); font-weight: 700; }
+.friends-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.friend-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.profile-photo-actions { display: flex; align-items: center; gap: 14px; }
+.friend-challenge { display: grid; grid-template-columns: 1fr auto; gap: 14px; padding: 15px 0; border-top: 1px solid var(--line); }
+.friend-challenge strong, .friend-challenge p { display: block; margin: 9px 0 0; }
+.friend-challenge p { color: var(--ink-muted); }
+.friend-answer { grid-column: 1 / -1; }
+.modal-scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgb(20 18 15 / 48%); }
+.modal-card { position: relative; width: min(520px, 100%); display: grid; gap: 14px; padding: 24px; }
+.modal-close { position: absolute; top: 14px; right: 14px; border: 0; background: transparent; color: var(--ink-muted); cursor: pointer; }
+@media (max-width: 680px) {
+  .friends-profile, .friends-lookup-row { grid-template-columns: 1fr; }
+  .friend-preview { align-items: flex-start; flex-wrap: wrap; }
+  .friend-actions { width: 100%; justify-content: flex-start; margin-left: 55px; }
+  .friend-challenge { grid-template-columns: 1fr; }
+}
+
 /* Phase 2: compact warm identity and responsive hierarchy. */
 :root {
   --blue: var(--lavender);
@@ -140,7 +170,7 @@ h1 em, h2 em, h3 em { font-style: normal; color: var(--coral); }
 .take-card h3 { overflow-wrap: anywhere; }
 .take-source-note { margin-top: 6px; color: var(--text-muted); font-size: 10px; }
 .round-arrow { min-width: 44px; min-height: 44px; }
-.mobile-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mobile-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .mobile-nav button { min-width: 0; color: var(--text-secondary); }
 .mobile-nav button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-page { max-width: 980px; margin: 0 auto; }

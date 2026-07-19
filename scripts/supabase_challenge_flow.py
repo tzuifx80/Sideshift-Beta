@@ -212,7 +212,7 @@ def wait_for_app_ready(page: Page, label: str) -> None:
         page.wait_for_function(
             """() => {
               const body = document.body?.innerText || '';
-              return Boolean(document.querySelector('#display-name'))
+              return Boolean(document.querySelector('#onboarding-language, #onboarding-name, #display-name'))
                 || body.includes('Private session unavailable')
                 || body.includes('Private data unavailable')
                 || body.includes('Backend unavailable');
@@ -230,8 +230,7 @@ def wait_for_app_ready(page: Page, label: str) -> None:
     if "private data unavailable" in lower or "backend unavailable" in lower or "private session unavailable" in lower:
         raise RuntimeError(f"{label} reached an application error state: {body[:1000]}")
 
-    display_name = page.get_by_label("Display name")
-    display_name.wait_for(state="visible", timeout=2_000)
+    page.locator("#onboarding-language, #onboarding-name, #display-name").first.wait_for(state="visible", timeout=2_000)
 
 
 def open_app(page: Page, label: str) -> None:
@@ -312,8 +311,11 @@ def run_flow(env: dict[str, str], diagnostics_dir: Path) -> None:
             pages.append((page_a, diagnostics_a))
 
             open_app(page_a, "Context A")
+            page_a.get_by_role("button", name="Continue", exact=True).click()
             page_a.get_by_label("Display name").fill("Supabase A")
-            page_a.get_by_role("button", name="Enter the arena").click()
+            page_a.get_by_role("button", name="Continue", exact=True).click()
+            page_a.get_by_role("button", name="Continue", exact=True).click()
+            page_a.get_by_role("button", name="Skip for now", exact=True).click()
             page_a.get_by_text(re.compile(r"Good (morning|afternoon|evening), Supabase"), exact=False).wait_for(timeout=PAGE_TIMEOUT_MS)
             if page_a.get_by_role("dialog").count():
                 page_a.get_by_role("dialog").get_by_text("Got it", exact=True).click()
