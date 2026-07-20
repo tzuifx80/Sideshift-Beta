@@ -4,6 +4,7 @@ import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, 
 import { makeUuid } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupRole, GroupSummary } from '../collaboration'
 import type { LocalGroup } from '../storage'
+import { defaultProfileFieldVisibility } from '../profile'
 
 function cloneState(): PersistedState {
   return loadState()
@@ -26,11 +27,11 @@ export function createLocalRepository(): AppRepository {
     async loadProfile(userId) {
       const state = cloneState()
       if (state.userId !== userId) return null
-      return { id: state.userId, displayName: state.name || null, bio: state.bio || null, avatarPreset: state.avatarPreset, interfaceLanguage: state.language, challengeShowName: state.challengeShowName, shareRealStance: state.shareRealStance, publicProfileKey: null, handle: null, friendCode: null, avatarPath: null, profileAccent: state.accent, profileVisibility: 'private', avatarVisibility: 'private', visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false } }
+      return { id: state.userId, displayName: state.name || null, bio: state.bio || null, avatarPreset: state.avatarPreset, interfaceLanguage: state.language, challengeShowName: state.challengeShowName, shareRealStance: state.shareRealStance, publicProfileKey: null, handle: null, friendCode: null, avatarPath: null, profileAccent: state.accent, profileVisibility: state.profileVisibility, avatarVisibility: state.profileFieldVisibility.avatar, fieldVisibility: state.profileFieldVisibility, visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false }, socialLinks: state.socialLinks }
     },
     async saveProfile(profile) {
       const state = cloneState()
-      saveState({ ...state, userId: profile.id, name: profile.displayName || '', bio: profile.bio || '', avatarPreset: profile.avatarPreset, language: profile.interfaceLanguage, challengeShowName: profile.challengeShowName, shareRealStance: profile.shareRealStance })
+      saveState({ ...state, userId: profile.id, name: profile.displayName || '', bio: profile.bio || '', avatarPreset: profile.avatarPreset, language: profile.interfaceLanguage, challengeShowName: profile.challengeShowName, shareRealStance: profile.shareRealStance, profileVisibility: profile.profileVisibility, profileFieldVisibility: profile.fieldVisibility, socialLinks: profile.socialLinks })
     },
     async loadPreferences(userId) {
       const state = cloneState()
@@ -42,6 +43,7 @@ export function createLocalRepository(): AppRepository {
       saveState({ ...state, userId: preferences.userId, interests: preferences.topicPreferences, onboarded: preferences.onboardingCompleted, debateLanguage: preferences.debateLanguages[0] || state.debateLanguage, intensity: preferences.intensity || state.intensity, preferredMode: preferences.preferredMode, preferredAiStyle: preferences.preferredAiStyle || state.preferredAiStyle, preferredOpponentType: preferences.preferredOpponentType, preferredAiFamily: preferences.preferredAiFamily, preferredOpponentId: preferences.preferredOpponentId, preferredAiModelId: preferences.preferredAiModelId, aiDifficulty: preferences.aiDifficulty, aiRoundLength: preferences.aiRoundLength, aiQuality: preferences.aiQuality, aiResponseLength: preferences.aiResponseLength, showModelDetails: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reducedMotion: preferences.reducedMotion, textSize: preferences.textSize, shareRealStance: preferences.shareRealStance })
     },
     async getPrivateProfile() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
+    async getProfileForViewer() { return { state: 'unavailable', relationship: 'outsider', profile: null, socialLinks: [], statistics: {}, isOwner: false } },
     async lookupProfileByHandle() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
     async lookupProfileByFriendCode() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
     async regenerateFriendCode() { throw new Error('Friends are available only with authenticated Supabase persistence.') },

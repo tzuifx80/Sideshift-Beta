@@ -1,9 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { getTake, type DebateSnapshot, type Language, type ResultData, type Stance } from '../domain'
-import { normalizePreferences } from '../profile'
+import { defaultProfileFieldVisibility, normalizePreferences } from '../profile'
 import { challengeRecordSchema, debateSnapshotSchema, resultDataSchema, teamDebateSessionSchema } from './schemas'
-import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput, ReportRecord, RepositoryError } from './repository'
+import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ProfileView, ReportInput, ReportRecord, RepositoryError } from './repository'
 import { RepositoryError as RepositoryErrorClass } from './repository'
 import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupMember, GroupRole, GroupSummary, GroupTopic, TeamDebateSession } from '../collaboration'
@@ -39,8 +39,12 @@ const preferencesRowSchema = z.object({
   onboarding_goal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']).nullable().optional(),
   onboarding_dismissed: z.boolean().nullable().optional(),
 }).passthrough()
+const visibilitySchema = z.enum(['private', 'friends', 'shared_groups', 'public'])
+const fieldVisibilitySchema = z.object({ avatar: visibilitySchema, displayName: visibilitySchema, bio: visibilitySchema, profileAccent: visibilitySchema, argumentDna: visibilitySchema, statistics: visibilitySchema, socialLinks: visibilitySchema, groupRelationship: visibilitySchema }).partial()
+const socialLinkSchema = z.object({ provider: z.enum(['instagram', 'tiktok', 'youtube', 'twitch', 'github', 'spotify', 'x', 'website']), url: z.string().url(), label: z.string().max(40).nullable(), visibility: visibilitySchema, order: z.number().int().min(0).max(4) })
 const profilePreviewSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPath: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), visibleStats: z.record(z.string(), z.boolean()) })
-const privateProfileSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), friendCode: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), avatarPath: z.string().nullable(), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), profileVisibility: z.enum(['friends', 'shared_groups', 'private']), avatarVisibility: z.enum(['friends', 'shared_groups', 'private']), visibleStats: z.record(z.string(), z.boolean()), interfaceLanguage: languageSchema, challengeShowName: z.boolean(), shareRealStance: z.boolean() })
+const privateProfileSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), friendCode: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), avatarPath: z.string().nullable(), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), profileVisibility: visibilitySchema, avatarVisibility: visibilitySchema, fieldVisibility: fieldVisibilitySchema, visibleStats: z.record(z.string(), z.boolean()), socialLinks: z.array(socialLinkSchema), interfaceLanguage: languageSchema, challengeShowName: z.boolean(), shareRealStance: z.boolean() })
+const profileViewSchema = z.object({ state: z.enum(['available', 'private', 'unavailable']), relationship: z.enum(['owner', 'friend', 'shared_group', 'outsider']), profile: profilePreviewSchema.nullable(), socialLinks: z.array(socialLinkSchema), statistics: z.record(z.string(), z.number()), isOwner: z.boolean() })
 const friendshipSchema = z.object({ id: z.string().uuid(), status: z.enum(['pending', 'accepted', 'declined', 'cancelled', 'removed', 'blocked']), direction: z.enum(['incoming', 'outgoing']), profile: profilePreviewSchema.nullable() })
 const friendChallengeSchema = z.object({ id: z.string().uuid(), takeId: z.string(), mode: z.string(), argument: z.string(), creatorSide: z.string(), status: z.enum(['open', 'completed', 'expired', 'revoked']), expiresAt: z.string(), response: z.string().nullable(), result: z.object({ total: z.number() }).nullable(), direction: z.enum(['incoming', 'outgoing']), creator: profilePreviewSchema.nullable(), recipient: profilePreviewSchema.nullable() })
 const groupFriendInvitationSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), groupName: z.string(), status: z.enum(['pending', 'expired']), expiresAt: z.string(), inviter: profilePreviewSchema.nullable() })
@@ -259,7 +263,13 @@ function mapPrivateProfile(userId: string, value: unknown): UserProfile | null {
   if (value === null || value === undefined) return null
   const parsed = privateProfileSchema.safeParse(value)
   if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid private profile data.')
-  return { id: userId, displayName: parsed.data.displayName, bio: parsed.data.bio, avatarPreset: parsed.data.avatarPreset, interfaceLanguage: parsed.data.interfaceLanguage, challengeShowName: parsed.data.challengeShowName, shareRealStance: parsed.data.shareRealStance, publicProfileKey: parsed.data.profileKey, handle: parsed.data.handle, friendCode: parsed.data.friendCode, avatarPath: parsed.data.avatarPath, profileAccent: parsed.data.profileAccent, profileVisibility: parsed.data.profileVisibility, avatarVisibility: parsed.data.avatarVisibility, visibleStats: mapVisibleStats(parsed.data.visibleStats) }
+  return { id: userId, displayName: parsed.data.displayName, bio: parsed.data.bio, avatarPreset: parsed.data.avatarPreset, interfaceLanguage: parsed.data.interfaceLanguage, challengeShowName: parsed.data.challengeShowName, shareRealStance: parsed.data.shareRealStance, publicProfileKey: parsed.data.profileKey, handle: parsed.data.handle, friendCode: parsed.data.friendCode, avatarPath: parsed.data.avatarPath, profileAccent: parsed.data.profileAccent, profileVisibility: parsed.data.profileVisibility, avatarVisibility: parsed.data.avatarVisibility, fieldVisibility: { ...defaultProfileFieldVisibility, ...parsed.data.fieldVisibility }, visibleStats: mapVisibleStats(parsed.data.visibleStats), socialLinks: parsed.data.socialLinks }
+}
+
+function mapProfileView(value: unknown): ProfileView {
+  const parsed = profileViewSchema.safeParse(value)
+  if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid profile data.')
+  return parsed.data
 }
 
 function mapFriendship(value: unknown): FriendshipRecord {
@@ -319,7 +329,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
   }
 
   async function saveProfile(profile: UserProfile): Promise<void> {
-    const { error } = await client.rpc('update_my_profile', { p_display_name: profile.displayName, p_bio: profile.bio, p_avatar_preset: profile.avatarPreset, p_interface_language: profile.interfaceLanguage, p_challenge_show_name: profile.challengeShowName, p_share_real_stance: profile.shareRealStance, p_handle: profile.handle, p_profile_accent: profile.profileAccent, p_profile_visibility: profile.profileVisibility, p_avatar_visibility: profile.avatarVisibility, p_visible_stats: profile.visibleStats })
+    const { error } = await client.rpc('update_my_profile_v2', { p_display_name: profile.displayName, p_bio: profile.bio, p_avatar_preset: profile.avatarPreset, p_interface_language: profile.interfaceLanguage, p_challenge_show_name: profile.challengeShowName, p_share_real_stance: profile.shareRealStance, p_handle: profile.handle, p_profile_accent: profile.profileAccent, p_profile_visibility: profile.profileVisibility, p_avatar_visibility: profile.avatarVisibility, p_visible_stats: profile.visibleStats, p_field_visibility: profile.fieldVisibility, p_social_links: profile.socialLinks })
     if (error) throw mapSupabaseError('saving your profile', error)
   }
 
@@ -337,6 +347,12 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
 
   async function getPrivateProfile(userId: string): Promise<UserProfile | null> {
     return loadProfile(userId)
+  }
+
+  async function getProfileForViewer(_userId: string, profileKey: string): Promise<ProfileView> {
+    const { data, error } = await client.rpc('get_profile_for_viewer', { p_profile_key: profileKey })
+    if (error) throw mapSupabaseError('loading that profile', error)
+    return mapProfileView(data)
   }
 
   async function lookupProfileByHandle(_userId: string, handle: string): Promise<ProfilePreview | null> {
@@ -741,5 +757,5 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (error) throw mapSupabaseError('recording group participation', error)
   }
 
-  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation }
+  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, getProfileForViewer, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation }
 }

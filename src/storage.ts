@@ -1,5 +1,5 @@
 import type { DebateSnapshot, Language, Mode, ResultData } from './domain'
-import type { AccentTheme, AppearanceTheme, AvatarPreset, TextSize } from './data/types'
+import type { AccentTheme, AppearanceTheme, AvatarPreset, ProfileFieldVisibility, ProfileVisibility, SocialLink, TextSize } from './data/types'
 import type { GroupInvite, GroupMember, GroupTopic, TeamDebateSession } from './collaboration'
 import { makeId } from './domain'
 
@@ -10,6 +10,9 @@ export type PersistedState = {
   onboarded: boolean
   name: string
   bio: string
+  profileVisibility: ProfileVisibility
+  profileFieldVisibility: ProfileFieldVisibility
+  socialLinks: SocialLink[]
   avatarPreset: AvatarPreset
   challengeShowName: boolean
   shareRealStance: boolean
@@ -79,6 +82,9 @@ const defaultState = (): PersistedState => ({
   onboarded: false,
   name: '',
   bio: '',
+  profileVisibility: 'private',
+  profileFieldVisibility: { avatar: 'friends', displayName: 'public', bio: 'friends', profileAccent: 'friends', argumentDna: 'friends', statistics: 'friends', socialLinks: 'friends', groupRelationship: 'shared_groups' },
+  socialLinks: [],
   avatarPreset: 'orbit',
   challengeShowName: false,
   shareRealStance: false,
@@ -132,6 +138,9 @@ export function loadState(): PersistedState {
       ...parsed,
       userId: typeof parsed.userId === 'string' && parsed.userId ? parsed.userId : fallback.userId,
       bio: typeof parsed.bio === 'string' ? parsed.bio.slice(0, 160) : '',
+      profileVisibility: ['private', 'friends', 'shared_groups', 'public'].includes(parsed.profileVisibility as string) ? parsed.profileVisibility as ProfileVisibility : fallback.profileVisibility,
+      profileFieldVisibility: parsed.profileFieldVisibility && typeof parsed.profileFieldVisibility === 'object' ? { ...fallback.profileFieldVisibility, ...parsed.profileFieldVisibility } : fallback.profileFieldVisibility,
+      socialLinks: Array.isArray(parsed.socialLinks) ? parsed.socialLinks.slice(0, 5) as SocialLink[] : [],
       avatarPreset: ['orbit', 'spark', 'wave', 'sun', 'leaf'].includes(parsed.avatarPreset as string) ? parsed.avatarPreset as AvatarPreset : fallback.avatarPreset,
       challengeShowName: parsed.challengeShowName === true,
       shareRealStance: parsed.shareRealStance === true,

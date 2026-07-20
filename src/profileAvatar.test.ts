@@ -6,7 +6,7 @@ const profile: UserProfile = {
   id: 'user-1', displayName: 'Alex', bio: null, avatarPreset: 'orbit', interfaceLanguage: 'en',
   challengeShowName: false, shareRealStance: false, publicProfileKey: 'profile-1', handle: null,
   friendCode: null, avatarPath: null, profileAccent: 'coral', profileVisibility: 'friends',
-  avatarVisibility: 'private', visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false },
+  avatarVisibility: 'private', fieldVisibility: { avatar: 'friends', displayName: 'public', bio: 'friends', profileAccent: 'friends', argumentDna: 'friends', statistics: 'friends', socialLinks: 'friends', groupRelationship: 'shared_groups' }, visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false }, socialLinks: [],
 }
 
 describe('profile avatar display state', () => {

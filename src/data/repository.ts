@@ -1,4 +1,4 @@
-import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
+import type { BackendName, ProfileStats, RepositoryDiagnostics, SocialLink, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
 import type { DebateSnapshot, ResultData } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupSummary, TeamDebateSession } from '../collaboration'
 
@@ -61,6 +61,15 @@ export type ProfilePreview = {
   visibleStats: Partial<VisibleProfileStats>
 }
 
+export type ProfileView = {
+  state: 'available' | 'private' | 'unavailable'
+  relationship: 'owner' | 'friend' | 'shared_group' | 'outsider'
+  profile: ProfilePreview | null
+  socialLinks: SocialLink[]
+  statistics: Partial<ProfileStats>
+  isOwner: boolean
+}
+
 export type FriendshipRecord = { id: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'removed' | 'blocked'; direction: 'incoming' | 'outgoing'; profile: ProfilePreview | null }
 export type FriendChallengeRecord = { id: string; takeId: string; mode: string; argument: string; creatorSide: string; status: 'open' | 'completed' | 'expired' | 'revoked'; expiresAt: string; response: string | null; result: { total: number } | null; direction: 'incoming' | 'outgoing'; creator: ProfilePreview | null; recipient: ProfilePreview | null }
 export type GroupFriendInvitation = { id: string; groupId: string; groupName: string; status: 'pending' | 'expired'; expiresAt: string; inviter: ProfilePreview | null }
@@ -73,6 +82,7 @@ export type AppRepository = {
   loadPreferences(userId: string): Promise<UserPreferences | null>
   savePreferences(preferences: UserPreferences): Promise<void>
   getPrivateProfile(userId: string): Promise<UserProfile | null>
+  getProfileForViewer(userId: string, profileKey: string): Promise<ProfileView>
   lookupProfileByHandle(userId: string, handle: string): Promise<ProfilePreview | null>
   lookupProfileByFriendCode(userId: string, code: string): Promise<ProfilePreview | null>
   regenerateFriendCode(userId: string): Promise<string>

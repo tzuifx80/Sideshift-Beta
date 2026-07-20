@@ -6,8 +6,13 @@ export type AvatarPreset = 'orbit' | 'spark' | 'wave' | 'sun' | 'leaf'
 export type AppearanceTheme = 'system' | 'light' | 'dark'
 export type AccentTheme = 'violet' | 'cyan' | 'amber' | 'coral' | 'mint' | 'neutral'
 export type TextSize = 'compact' | 'comfortable'
-export type ProfileVisibility = 'friends' | 'shared_groups' | 'private'
+export type ProfileVisibility = 'private' | 'friends' | 'shared_groups' | 'public'
+export type ProfileField = 'avatar' | 'displayName' | 'bio' | 'profileAccent' | 'argumentDna' | 'statistics' | 'socialLinks' | 'groupRelationship'
+export type ProfileFieldVisibility = Record<ProfileField, ProfileVisibility>
+export type SocialProvider = 'instagram' | 'tiktok' | 'youtube' | 'twitch' | 'github' | 'spotify' | 'x' | 'website'
+export type SocialLink = { provider: SocialProvider; url: string; label: string | null; visibility: ProfileVisibility; order: number }
 export type VisibleProfileStats = { debates: boolean; sideSwitches: boolean; constructive: boolean; argumentDna: boolean }
+export type ProfileStats = { debatesCompleted: number; sideSwitchesCompleted: number; topicsExplored: number; challengeResponses: number; challengesCreated: number; languagesUsed: number }
 
 export type UserProfile = {
   id: string
@@ -25,7 +30,9 @@ export type UserProfile = {
   profileAccent: AccentTheme
   profileVisibility: ProfileVisibility
   avatarVisibility: ProfileVisibility
+  fieldVisibility: ProfileFieldVisibility
   visibleStats: VisibleProfileStats
+  socialLinks: SocialLink[]
 }
 
 export type UserPreferences = {

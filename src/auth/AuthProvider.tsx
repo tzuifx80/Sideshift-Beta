@@ -4,6 +4,7 @@ import { loadState } from '../storage'
 import { selectRepository } from '../data/selectRepository'
 import { createSupabaseBrowserClient, getOrCreateAnonymousSession, readSupabaseConfig } from '../data/supabaseClient'
 import type { AppRepository } from '../data/repository'
+import { defaultProfileFieldVisibility } from '../profile'
 
 export type AuthState = {
   user: User | null
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = await getOrCreateAnonymousSession(client)
       const repository = selectRepository({ VITE_DATA_BACKEND: 'supabase', VITE_SUPABASE_URL: config.url, VITE_SUPABASE_ANON_KEY: config.anonKey }, client)
       const existingProfile = await repository.loadProfile(session.user.id)
-      if (!existingProfile) await repository.saveProfile({ id: session.user.id, displayName: null, bio: null, avatarPreset: 'orbit', interfaceLanguage: 'en', challengeShowName: false, shareRealStance: false, publicProfileKey: null, handle: null, friendCode: null, avatarPath: null, profileAccent: 'coral', profileVisibility: 'friends', avatarVisibility: 'private', visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false } })
+      if (!existingProfile) await repository.saveProfile({ id: session.user.id, displayName: null, bio: null, avatarPreset: 'orbit', interfaceLanguage: 'en', challengeShowName: false, shareRealStance: false, publicProfileKey: null, handle: null, friendCode: null, avatarPath: null, profileAccent: 'coral', profileVisibility: 'friends', avatarVisibility: 'private', fieldVisibility: { ...defaultProfileFieldVisibility }, visibleStats: { debates: true, sideSwitches: true, constructive: true, argumentDna: false }, socialLinks: [] })
       const existingPreferences = await repository.loadPreferences(session.user.id)
       if (!existingPreferences) await repository.savePreferences({ userId: session.user.id, topicPreferences: [], debateLanguages: ['en'], intensity: 'balanced', preferredMode: 'sideswitch', preferredAiStyle: 'sharp-skeptic', preferredOpponentType: 'ask', preferredAiFamily: 'GPT', preferredOpponentId: 'gpt-logician', preferredAiModelId: null, aiDifficulty: 'intermediate', aiRoundLength: 'standard', aiQuality: 'balanced', aiResponseLength: 'standard', showModelDetails: false, theme: 'system', accent: 'coral', reducedMotion: false, textSize: 'comfortable', shareRealStance: false, onboardingCompleted: false, onboardingStage: 0, onboardingGoal: 'reasoning', onboardingDismissed: false })
       setSession(session, repository)
