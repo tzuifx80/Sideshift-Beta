@@ -21,6 +21,7 @@ export type UserProfile = {
   handle: string | null
   friendCode: string | null
   avatarPath: string | null
+  avatarRevision?: number
   profileAccent: AccentTheme
   profileVisibility: ProfileVisibility
   avatarVisibility: ProfileVisibility

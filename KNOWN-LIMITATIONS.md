@@ -5,3 +5,5 @@
 - `npm run verify:providers:live` reaches the three-turn Basic and evaluation checks, then fails at the existing feedback-email delivery assertion (`delivery_status: failed` instead of `sent`).
 - The exact production `npm run build` command is blocked by the intentionally local/private ignored API URL. A compile-only production build with a public HTTPS placeholder passed; no production endpoint was configured or claimed.
 - Build warnings from Puter CommonJS interop and large chunks remain unchanged.
+- Browser screenshot automation was unavailable in this workspace; target viewport evidence is therefore limited to static responsive contracts and successful builds. Manual 320/360/375/390/412px, Large Text, dark-mode, and multilingual visual checks remain required.
+- Dedicated native camera capture is not guaranteed: the installed Android project still contains only App, Browser, and Share Capacitor plugins. The avatar flow remains honest about system picker support.

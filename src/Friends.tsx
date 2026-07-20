@@ -21,7 +21,7 @@ function ProfilePreviewCard({ repository, userId, profile, fallback, children }:
   return <div className="friend-preview"><Avatar repository={repository} userId={userId} profile={profile} /><div><strong>{displayName(profile) || fallback}</strong>{profile.handle && <small>@{profile.handle}</small>}{profile.bio && <p>{profile.bio}</p>}</div><div className="friend-actions">{children}</div></div>
 }
 
-type FriendsProps = { userId: string; language: Language; repository: AppRepository; profile: UserProfile; onProfile: (profile: UserProfile) => void; online: boolean; onNotify: (message: string) => void }
+type FriendsProps = { userId: string; language: Language; repository: AppRepository; profile: UserProfile; onProfile: (profile: UserProfile, forceAvatarRevision?: boolean) => void; online: boolean; onNotify: (message: string) => void }
 
 export function Friends({ userId, language, repository, profile, onProfile, online, onNotify }: FriendsProps) {
   const t = useTranslations(language)
@@ -62,8 +62,8 @@ export function Friends({ userId, language, repository, profile, onProfile, onli
   async function lookup() { await run(async () => { const next = queryKind === 'handle' ? await repository.lookupProfileByHandle(userId, query) : await repository.lookupProfileByFriendCode(userId, query); setResult(next) }) }
   async function regenerateCode() { await run(async () => { const code = await repository.regenerateFriendCode(userId); onProfile({ ...profile, friendCode: code }); onNotify(t('friends.codeRegenerate')) }) }
   async function copyCode() { if (!profile.friendCode) return; await navigator.clipboard?.writeText(profile.friendCode); onNotify(t('friends.copyCode')) }
-  async function uploadPhoto(blob: Blob) { await run(async () => { const path = await repository.uploadAvatar(userId, blob, 'image/webp'); onProfile({ ...profile, avatarPath: path }); onNotify(t('settings.saved')) }) }
-  async function removePhoto() { await run(async () => { await repository.removeAvatar(userId); onProfile({ ...profile, avatarPath: null }); onNotify(t('settings.saved')) }) }
+  async function uploadPhoto(blob: Blob) { await run(async () => { const path = await repository.uploadAvatar(userId, blob, 'image/webp'); onProfile({ ...profile, avatarPath: path, avatarRevision: (profile.avatarRevision || 0) + 1 }, true); onNotify(t('settings.saved')) }) }
+  async function removePhoto() { await run(async () => { await repository.removeAvatar(userId); onProfile({ ...profile, avatarPath: null, avatarRevision: (profile.avatarRevision || 0) + 1 }, true); onNotify(t('settings.saved')) }) }
 
   if (repository.backend === 'local') return <div className="page friends-page"><div className="page-heading"><div><span className="eyebrow">{t('friends.eyebrow')}</span><h1>{t('friends.title')}<span className="heading-period">.</span></h1></div></div><section className="empty-state card-surface"><Icon name="lock" size={22} /><strong>{t('friends.deviceOnly')}</strong><span>{t('friends.privateOnly')}</span></section></div>
 

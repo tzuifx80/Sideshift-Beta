@@ -48,3 +48,14 @@ Configure the ignored physical-device API URL, rebuild/sync Android, then manual
 ### Exact next action
 
 Install `app-debug.apk` on an emulator or physical device with `adb`, run the three-turn Basic/lifecycle/navigation/keyboard smoke matrix, then perform the gallery and camera-or-gallery system-picker checks with a valid ignored API URL.
+
+## Mobile UX and avatar synchronization checkpoint — 2026-07-20
+
+- The active onboarding tree is now a concise four-stage mobile introduction: welcome, debate modes, SideSwitch, and personalization/first debate. Progress remains in the existing per-user local/server hydration path.
+- Header and profile avatar rendering consume the shared profile-avatar snapshot. Upload, replacement, and removal update the client-only revision while retaining the private `publicProfileKey/current.webp` path and signed access.
+- Shared mobile CSS tokens set 16px form text, 44–48px touch targets, safe-area spacing, responsive headings, compact cards, and five-destination bottom navigation. No applied migration changed.
+- Automated evidence is green: 25 Vitest files / 86 tests, typecheck, lint, and development Vite build. Browser automation was unavailable, and physical Android visual/media checks remain pending.
+
+### Exact next action
+
+Install the rebuilt debug APK on the real phone, verify 320–412px-equivalent layout at device font scale, then upload/replace/remove a private avatar and confirm the header and profile update before reporting the visual phase complete.

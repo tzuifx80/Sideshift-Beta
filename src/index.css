@@ -293,6 +293,87 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 
+/* Android phone surface: keep the editorial identity, but give it mobile-native rhythm. */
+:root {
+  --mobile-page-pad: clamp(14px, 5vw, 22px);
+  --mobile-control-height: 48px;
+  --mobile-body-size: 16px;
+}
+.profile-avatar { display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; color: var(--ink); background: var(--coral); font-family: 'Space Grotesk'; font-size: 12px; font-weight: 700; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.top-avatar { overflow: hidden; padding: 0; }
+.top-avatar .profile-avatar { color: white; background: transparent; font-size: 12px; }
+.profile-mini-avatar { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; }
+.profile-mini-avatar .profile-avatar { font-size: 12px; }
+.onboarding-progress { display: flex; gap: 6px; width: min(100%, 520px); margin: 24px auto 0; }
+.onboarding-progress span { height: 4px; flex: 1; border-radius: 9px; background: var(--line); }
+.onboarding-progress span.active { background: var(--coral); }
+.onboarding-mobile-main { width: min(100%, 620px); margin: 22px auto 0; }
+.onboarding-mobile-panel { margin-top: 14px; padding: clamp(22px, 5vw, 36px); border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 18px 52px rgb(65 54 42 / 8%); }
+.onboarding-mobile-panel h1 { max-width: 520px; margin-top: 14px; font-size: clamp(32px, 8vw, 58px); line-height: .98; letter-spacing: -.045em; }
+.onboarding-mobile-panel > p { max-width: 510px; margin-top: 14px; color: var(--text-secondary); font-size: 16px; line-height: 1.55; }
+.onboarding-mobile-panel .field-label { margin-top: 22px; }
+.onboarding-visual { position: relative; display: grid; place-items: center; width: 100%; height: 126px; margin-bottom: 22px; overflow: hidden; border-radius: 14px; background: var(--lavender); }
+.onboarding-visual span { position: relative; z-index: 1; color: var(--ink); font: 700 72px/1 'Space Grotesk'; transform: rotate(-12deg); }
+.onboarding-visual i, .onboarding-visual b { position: absolute; border: 1px solid rgb(132 116 232 / 44%); border-radius: 50%; }
+.onboarding-visual i { width: 280px; height: 92px; transform: rotate(-20deg); }
+.onboarding-visual b { width: 100px; height: 190px; transform: rotate(28deg); }
+.onboarding-mode-list { display: grid; gap: 9px; margin: 22px 0; }
+.onboarding-mode-list article { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; align-items: start; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-subtle); }
+.onboarding-mode-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; color: var(--coral-dark); background: color-mix(in srgb, var(--coral) 18%, var(--surface)); }
+.onboarding-mode-list h2 { font-size: 16px; line-height: 1.2; }
+.onboarding-mode-list p { margin-top: 4px; color: var(--text-secondary); font-size: 14px; line-height: 1.45; }
+.onboarding-example { display: grid; gap: 8px; margin: 22px 0 14px; padding: 16px; border-left: 4px solid var(--coral); background: var(--surface-subtle); }
+.onboarding-example strong { font-size: 16px; line-height: 1.4; }
+.onboarding-benefits { color: var(--text-primary) !important; font-weight: 700; }
+.onboarding-mobile-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.onboarding-mobile-actions .text-link:first-child svg { transform: rotate(180deg); }
+
+@media (max-width: 680px) {
+  body { font-size: var(--mobile-body-size); }
+  .topbar { min-height: 68px; height: auto; padding: env(safe-area-inset-top) var(--mobile-page-pad) 0; }
+  .topbar-actions { min-height: 60px; }
+  .main-content { padding: 24px var(--mobile-page-pad) calc(96px + env(safe-area-inset-bottom)); }
+  .page-heading h1 { max-width: 100%; font-size: clamp(30px, 9vw, 40px); line-height: 1.02; letter-spacing: -.04em; overflow-wrap: anywhere; }
+  .page-heading .muted, .muted { font-size: 15px; line-height: 1.5; }
+  .button { min-height: var(--mobile-control-height); padding: 0 16px; font-size: 14px; }
+  .text-link { min-height: 44px; font-size: 13px; }
+  input, select, textarea, .text-input, .settings-select, .settings-textarea, .clash-textarea, .team-composer textarea { font-size: 16px !important; }
+  .field-label { margin-top: 17px; font-size: 12px; line-height: 1.35; }
+  .card-surface { border-radius: 14px; }
+  .world-card-main { padding: 20px; }
+  .world-card h2 { font-size: clamp(22px, 7vw, 31px); line-height: 1.08; }
+  .world-card p, .take-card-source, .take-source-note { font-size: 14px; line-height: 1.5; }
+  .world-bottom, .section-heading { align-items: flex-start; flex-direction: column; }
+  .world-bottom .button, .section-heading .text-link { width: 100%; }
+  .take-card h3 { font-size: 17px; line-height: 1.25; }
+  .take-card-meta > span:last-child, .difficulty { font-size: 12px; }
+  .filter { min-height: 44px; padding: 8px 13px; font-size: 13px; }
+  .mobile-nav { padding: 7px 6px env(safe-area-inset-bottom); }
+  .mobile-nav button { min-height: 48px; gap: 4px; font-size: 11px; }
+  .mobile-nav button span { font-size: 11px; }
+  .onboarding-page { min-height: 100dvh; padding: max(18px, env(safe-area-inset-top)) var(--mobile-page-pad) calc(24px + env(safe-area-inset-bottom)); overflow: visible; }
+  .onboarding-mobile-main { margin-top: 18px; }
+  .onboarding-mobile-panel { padding: 20px 18px; }
+  .onboarding-mobile-panel h1 { font-size: clamp(31px, 9vw, 43px); }
+  .onboarding-mobile-panel > p, .onboarding-mode-list p { font-size: 15px; }
+  .onboarding-mobile-panel .interest-grid { gap: 8px; }
+  .onboarding-mobile-panel .interest-chip { min-height: 44px; padding: 8px 11px; font-size: 13px; }
+  .profile-photo-actions, .friend-actions { align-items: stretch; flex-direction: column; }
+  .profile-photo-actions .button, .friend-actions .button { width: 100%; }
+  .friends-profile, .settings-section, .profile-hero, .profile-stats { padding: 20px; }
+  .settings-section-heading h2 { font-size: 22px; }
+  .debate-layout { padding-left: var(--mobile-page-pad); padding-right: var(--mobile-page-pad); }
+  .response-box textarea { min-height: 132px; }
+}
+
+@media (max-width: 375px) {
+  .mobile-nav button { font-size: 10px; }
+  .mobile-nav button span { font-size: 10px; }
+  .topbar-actions .icon-button:nth-of-type(2) { display: none; }
+  .onboarding-mobile-panel { padding-left: 16px; padding-right: 16px; }
+}
+
 /* Beta reliability and accessibility states. */
 :where(button, input, textarea, select):focus-visible { outline: 3px solid color-mix(in srgb, var(--focus) 45%, transparent); outline-offset: 3px; }
 button { min-height: 36px; }

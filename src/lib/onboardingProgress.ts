@@ -1,5 +1,7 @@
 export type OnboardingProgress = { step: number; name: string; selected: string[]; goal: string }
 
+export const onboardingStepOrder = ['welcome', 'debate-choice', 'sideswitch', 'personalize'] as const
+
 export function onboardingStorageKey(userId: string) {
   return `sideshift-onboarding-progress:${userId}`
 }
