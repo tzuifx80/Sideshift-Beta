@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { basicUsageResponse, freeEntitlements, requestScope, utcDateKey } from './server/basicUsage.mjs'
+import { getCorsDecision } from './server/cors.mjs'
 import { sendFeedbackEmail } from './server/feedbackEmail.mjs'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
@@ -19,7 +20,8 @@ const appEnvironment = process.env.APP_ENV || (process.env.NODE_ENV === 'product
 const serverProduction = process.env.NODE_ENV === 'production' || appEnvironment === 'private-beta' || appEnvironment === 'production'
 const mockAi = process.env.MOCK_AI !== 'false' && aiProvider === 'mock'
 const appBaseUrl = process.env.APP_BASE_URL || ''
-const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : '*')).split(',').map(value => value.trim()).filter(Boolean))
+const defaultDevelopmentOrigins = 'http://127.0.0.1:5173,http://localhost:5173,https://localhost'
+const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : defaultDevelopmentOrigins)).split(',').map(value => value.trim()).filter(Boolean))
 const aiApiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || ''
 const aiModel = process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini'
 const serverAiMode = mockAi ? 'mock' : aiApiKey ? 'basic_server_available' : 'basic_server_unavailable'
@@ -57,7 +59,7 @@ function validateStartup() {
   if (serverProduction) {
     if (!['private-beta', 'production'].includes(appEnvironment)) throw new Error('APP_ENV must be private-beta or production in production.')
     if (!appBaseUrl || !appBaseUrl.startsWith('https://')) missing.push('APP_BASE_URL (https://...)')
-    if (!allowedOrigins.size || allowedOrigins.has('*')) missing.push('ALLOWED_ORIGINS (explicit HTTPS origin)')
+    if (!allowedOrigins.size || allowedOrigins.has('*') || [...allowedOrigins].some(origin => !origin.startsWith('https://'))) missing.push('ALLOWED_ORIGINS (explicit HTTPS origins)')
     if (mockAi) missing.push('MOCK_AI=false with a configured AI provider')
     else if (!aiApiKey) missing.push('AI_API_KEY')
     if (missing.length) throw new Error(`Missing or unsafe production configuration: ${missing.join(', ')}`)
@@ -263,13 +265,9 @@ function logEvent(req, category, extra = {}) {
 
 function applyCors(req, res) {
   const origin = req.headers.origin?.toString()
-  if (!origin) return true
-  if (!allowedOrigins.has('*') && !allowedOrigins.has(origin)) return false
-  res.setHeader('access-control-allow-origin', origin)
-  res.setHeader('access-control-allow-headers', 'authorization, apikey, content-type, x-request-id')
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS')
-  res.setHeader('vary', 'Origin')
-  return true
+  const decision = getCorsDecision(origin, allowedOrigins)
+  for (const [key, value] of Object.entries(decision.headers)) res.setHeader(key, value)
+  return decision.allowed
 }
 
 function rateLimit(req, key, max) {
@@ -446,7 +444,7 @@ async function updateFeedbackDelivery(userId, feedbackId, status, message = null
 }
 
 async function handleApi(req, res, url) {
-  if (req.method === 'OPTIONS') return json(res, 204, {})
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end() }
   if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, status: 'ok', environment: appEnvironment, backend: dataBackend, persistence: dataBackend, aiMode: serverAiMode, ai: { provider: mockAi ? 'mock' : 'server', basicServerAvailable: basicAiConfigured } })
   if (url.pathname === '/api/ai/basic/capability' && req.method === 'GET') {
     const user = await authenticatedUser(req)

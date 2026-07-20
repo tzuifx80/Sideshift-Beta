@@ -73,6 +73,15 @@ npm run android:build
 
 The Capacitor app id is `com.sideshift.app`. Puter sign-in continues to be user-triggered; native lifecycle, back, deep-link, share, and external-browser adapters are included, but no store or device release is claimed here.
 
+Android development API routing is explicit. Browser development leaves `VITE_API_BASE_URL` empty and uses the Vite proxy. Android emulator builds set `VITE_ANDROID_API_TARGET=emulator` and use `http://10.0.2.2:8787`. Physical-device builds set `VITE_ANDROID_API_TARGET=device` and an ignored local `VITE_API_BASE_URL=http://<PC_LAN_IP>:8787`, while the API server uses `HOST=0.0.0.0` and an explicit development `ALLOWED_ORIGINS=https://localhost`. Never commit the LAN address. Production builds require `VITE_API_BASE_URL=https://...`; they do not use localhost, private-LAN fallbacks, or cleartext traffic.
+
+After changing these values, rebuild and sync the native bundle:
+
+```powershell
+npm run build
+npx cap sync android
+```
+
 The managed browser regression is lifecycle-safe:
 
 ```powershell

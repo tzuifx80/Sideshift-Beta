@@ -1,3 +1,5 @@
+import { apiRequest } from './data/api'
+
 export type AnalyticsEvent =
   | 'landing_viewed'
   | 'onboarding_started'
@@ -17,7 +19,6 @@ export type AnalyticsEvent =
   | 'recoverable_error_encountered'
 
 let accessToken: string | null = null
-const apiBase = String(import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 export function setAnalyticsAccessToken(token: string | null): void {
   accessToken = token
@@ -26,7 +27,7 @@ export function setAnalyticsAccessToken(token: string | null): void {
 export function trackEvent(event: AnalyticsEvent, properties: Record<string, string | number | boolean | null> = {}): void {
   if (import.meta.env.DEV) console.debug(`[analytics] ${event}`, properties)
   if (!import.meta.env.PROD) return
-  void fetch(`${apiBase}/api/analytics`, {
+  void apiRequest('/api/analytics', {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
     body: JSON.stringify({ event, properties }),

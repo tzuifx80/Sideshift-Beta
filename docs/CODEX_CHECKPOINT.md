@@ -13,6 +13,9 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 - Blocking atomically marks the relationship blocked, revokes open direct challenges, and revokes pending targeted Group invitations.
 - Existing bearer-link challenge RPCs reject direct friend challenges and remain unchanged for bearer-link users.
 - Supabase preference hydration now accepts legacy nullable/missing fields, snake_case or camelCase aliases, and legacy JSON-array strings while retaining strict type checks and safe defaults.
+- SideShift server requests now use one environment-aware API client. Browser development uses the Vite relative proxy, Android emulator development can use `10.0.2.2`, physical Android development requires an explicit ignored `VITE_API_BASE_URL`, and production requires a public HTTPS API URL.
+- Basic AI capability, generation and evaluation requests share the configured API client; development diagnostics expose only host/path, status and safe outcome categories.
+- Profile settings now provide system gallery/camera entry points with cancellation handling and a processed 512px WebP preview before upload. Physical gallery/camera behavior remains unverified.
 
 ## Verification
 
@@ -25,9 +28,11 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 - Preference parser and authentication-bootstrap regression coverage passes; structural rejection diagnostics contain only field names, types, null/missing fields, and validation paths.
 - Added `scripts/private_social_flow.py` and `npm run test:playwright:private-social` for the focused three-context browser acceptance flow. The run reached the exact-handle lookup and pending-request path, but final remote execution was stopped after Supabase anonymous-auth rate limiting reported `Private session unavailable / Request rate limit reached` for the third isolated context. No further anonymous-auth retries were performed.
 - Physical Android camera/gallery verification remains pending; the web path uses browser-native canvas processing and the existing Capacitor foundation is not changed.
+- Android Basic routing was previously blocked because `BasicAiProvider` bypassed `VITE_API_BASE_URL` and used WebView-relative `/api` paths. The fix is implemented, but physical-device reachability still requires a configured PC LAN URL and a manual retest.
+- `npm run verify:providers:live` reached its Basic capability, live generation, idempotent replay, and structured evaluation assertions, then failed at the unrelated feedback-email delivery assertion (`delivery_status: failed` instead of `sent`). It was not retried to avoid extra provider calls.
 - The focused Friends browser flow is implemented but remains remotely unverified because anonymous authentication rate limiting blocked the final run. The earlier three-user RPC/RLS acceptance remains passing.
 - The repository still contains existing bundle warnings unrelated to this phase.
 
 ## Exact next action
 
-Retest Android startup and avatar media on a physical device with a valid existing session.
+Configure the ignored physical-device API URL, rebuild/sync Android, then manually retest Basic and profile media on a physical device with a valid existing session.

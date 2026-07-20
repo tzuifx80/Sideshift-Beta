@@ -1,4 +1,6 @@
 import { makeUuid } from '../../domain'
+import { apiRequest } from '../../data/api'
+import type { ApiConfigInput } from '../../data/apiConfig'
 import { AiProviderError, normalizeAiError } from './errors'
 import { normalizeModels } from './modelResolver'
 import { validateEvaluation } from './puterProvider'
@@ -11,7 +13,7 @@ type BasicCapability = {
   entitlements?: Record<string, unknown>
 }
 
-type BasicProviderOptions = { fetcher?: typeof fetch; accessToken?: string | null; userId?: string | null }
+type BasicProviderOptions = { fetcher?: typeof fetch; accessToken?: string | null; userId?: string | null; apiConfig?: ApiConfigInput }
 
 function headers(options: BasicProviderOptions, requestId?: string): Record<string, string> {
   return {
@@ -44,10 +46,14 @@ export class BasicAiProvider implements AiProvider {
   }
 
   private async loadCapability(): Promise<BasicCapability> {
-    const response = await this.fetcher('/api/ai/basic/capability', { headers: headers(this.options) })
+    const response = await this.request('/api/ai/basic/capability', { headers: headers(this.options) })
     const capability = await readJson<BasicCapability>(response)
     this.capability = capability
     return capability
+  }
+
+  private request(path: string, init: RequestInit): Promise<Response> {
+    return apiRequest(path, init, { fetcher: this.fetcher, apiConfig: this.options.apiConfig })
   }
 
   async getStatus() {
@@ -85,7 +91,7 @@ export class BasicAiProvider implements AiProvider {
   async streamChat(request: { modelId: string; messages: AiMessage[]; maxTokens: number; temperature?: number; debateId?: string; round?: number; requestId?: string }): Promise<AiStream> {
     if (this.status !== 'connected') await this.connect()
     const requestId = request.requestId || makeUuid()
-    const response = await this.fetcher('/api/ai/basic/opponent', {
+    const response = await this.request('/api/ai/basic/opponent', {
       method: 'POST',
       headers: headers(this.options, requestId),
       body: JSON.stringify({ modelId: request.modelId, messages: request.messages, maxTokens: Math.min(180, request.maxTokens), temperature: request.temperature ?? .35, debateId: request.debateId, round: request.round }),
@@ -97,7 +103,7 @@ export class BasicAiProvider implements AiProvider {
 
   async evaluate(messages: AiMessage[], modelId: string, request?: { debateId?: string; requestId?: string }): Promise<AiEvaluation> {
     if (this.status !== 'connected') await this.connect()
-    const response = await this.fetcher('/api/ai/basic/evaluate', {
+    const response = await this.request('/api/ai/basic/evaluate', {
       method: 'POST',
       headers: headers(this.options, request?.requestId || makeUuid()),
       body: JSON.stringify({ modelId, messages, debateId: request?.debateId }),

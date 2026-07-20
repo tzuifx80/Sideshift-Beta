@@ -11,7 +11,7 @@ function displayName(profile: ProfilePreview | null) { return profile?.displayNa
 
 function Avatar({ repository, userId, profile }: { repository: AppRepository; userId: string; profile: ProfilePreview | null }) {
   const [url, setUrl] = useState<string | null>(null)
-  useEffect(() => { let active = true; if (!profile?.avatarPath) { setUrl(null); return () => { active = false } }; void repository.getAvatarUrl(userId, profile.avatarPath).then(value => { if (active) setUrl(value) }).catch(() => { if (active) setUrl(null) }); return () => { active = false } }, [profile?.avatarPath, repository, userId])
+  useEffect(() => { let active = true; if (!profile?.avatarPath) { setUrl(null); return () => { active = false } }; setUrl(null); void repository.getAvatarUrl(userId, profile.avatarPath).then(value => { if (active) setUrl(value) }).catch(() => { if (active) setUrl(null) }); return () => { active = false } }, [profile, repository, userId])
   return <span className="friends-avatar">{url ? <img src={url} alt="" /> : <span>{(profile?.displayName || profile?.handle || '?').slice(0, 1).toUpperCase()}</span>}</span>
 }
 
@@ -42,7 +42,6 @@ export function Friends({ userId, language, repository, profile, onProfile, onli
   const [answer, setAnswer] = useState('')
   const [groupTarget, setGroupTarget] = useState<ProfilePreview | null>(null)
   const [groupId, setGroupId] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
     if (repository.backend === 'local') return
@@ -62,6 +61,7 @@ export function Friends({ userId, language, repository, profile, onProfile, onli
   async function lookup() { await run(async () => { const next = queryKind === 'handle' ? await repository.lookupProfileByHandle(userId, query) : await repository.lookupProfileByFriendCode(userId, query); setResult(next) }) }
   async function regenerateCode() { await run(async () => { const code = await repository.regenerateFriendCode(userId); onProfile({ ...profile, friendCode: code }); onNotify(t('friends.codeRegenerate')) }) }
   async function copyCode() { if (!profile.friendCode) return; await navigator.clipboard?.writeText(profile.friendCode); onNotify(t('friends.copyCode')) }
+  const fileRef = useRef<HTMLInputElement>(null)
   async function uploadPhoto(file: File) { await run(async () => { const { processAvatarFile } = await import('./avatar'); const processed = await processAvatarFile(file); const path = await repository.uploadAvatar(userId, processed, 'image/webp'); onProfile({ ...profile, avatarPath: path }); onNotify(t('settings.saved')) }) }
   async function removePhoto() { await run(async () => { await repository.removeAvatar(userId); onProfile({ ...profile, avatarPath: null }); onNotify(t('settings.saved')) }) }
 

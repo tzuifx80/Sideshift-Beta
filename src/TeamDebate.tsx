@@ -20,14 +20,12 @@ import {
 } from './collaboration'
 import { useTranslations } from './i18n'
 import type { TranslationKey } from './i18n'
-
-const teamApiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+import { apiFetch } from './data/api'
 const teamRoundKeys: Record<TeamRoundType, TranslationKey> = { opening: 'team.roundType.opening', argument: 'team.roundType.argument', rebuttal: 'team.roundType.rebuttal', question: 'team.roundType.question', answer: 'team.roundType.answer', closing: 'team.roundType.closing' }
 
 async function requestTeamReview(session: TeamDebateSession): Promise<TeamAiReview> {
-  const response = await fetch(`${teamApiBaseUrl}/api/ai/team-review`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic: session.topic.statement, teams: session.teams.map(team => ({ id: team.id, name: team.name })), transcript: session.turns.slice(0, 32).map(turn => ({ teamId: turn.teamId, teamName: session.teams.find(team => team.id === turn.teamId)?.name || turn.teamId, round: turn.round, roundType: turn.roundType, content: turn.content, skipped: Boolean(turn.skipped) })), language: session.language }) })
-  const payload = await response.json().catch(() => ({})) as { error?: { message?: string }; review?: TeamAiReview }
-  if (!response.ok || !payload.review) throw new Error(payload.error?.message || 'The AI review was unavailable. Your transcript is still saved.')
+  const payload = await apiFetch<{ review?: TeamAiReview }>('/api/ai/team-review', { method: 'POST', body: JSON.stringify({ topic: session.topic.statement, teams: session.teams.map(team => ({ id: team.id, name: team.name })), transcript: session.turns.slice(0, 32).map(turn => ({ teamId: turn.teamId, teamName: session.teams.find(team => team.id === turn.teamId)?.name || turn.teamId, round: turn.round, roundType: turn.roundType, content: turn.content, skipped: Boolean(turn.skipped) })), language: session.language }) })
+  if (!payload.review) throw new Error('The AI review was unavailable. Your transcript is still saved.')
   return payload.review
 }
 
