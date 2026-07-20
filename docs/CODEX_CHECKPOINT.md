@@ -81,12 +81,12 @@ Install the rebuilt debug APK on the real phone, verify 320–412px-equivalent l
 
 - Root cause: Storage initial INSERT passed, but `upsert`/UPDATE required a row read while `profiles.avatar_path` was still unset; the privacy SELECT policy therefore rejected the owner transition. A second policy attempt also exposed that an outer `profiles` query bypassed friend visibility under profile RLS.
 - Migrations `0025`–`0027` now use exact canonical owner paths, an owner-only transition read, and direct `can_view_profile_avatar` evaluation for validated non-owner paths. Remote migration history is applied through `0027` and the bucket remains private.
-- The targeted private-social verifier passed owner write, replacement, friend signed read, outsider denial, and cleanup. A subsequent four-viewer verifier attempt hit Supabase anonymous-auth rate limiting before setup; no further anonymous signups were attempted.
+- The targeted private-social verifier passed owner write, replacement, friend signed read, outsider denial, and cleanup. The four-viewer profile/privacy verifier now passes owner, accepted friend, shared-Group member, outsider, hidden-field omission, and blocked neutral-unavailable behavior.
 - `android:build:verify` passed with a process-only HTTPS placeholder. The local development TypeScript/Vite build, Capacitor sync, and Gradle debug APK build also passed. Production still rejects the configured private HTTP URL.
 
 ### Exact next action
 
-After Supabase anonymous-auth rate limits reset, run the existing four-viewer profile/privacy verifier once before beginning World Pulse or Debate League.
+Begin the next approved product phase only after the normal phase preconditions are rechecked; do not combine it with unrelated repairs.
 
 ### Exact next action
 

@@ -14,4 +14,4 @@ Repository verification is green for typecheck, lint, 30 Vitest files / 100 test
 - Non-owner reads continue through the privacy-aware signed-URL boundary; the owner-only transition read permits Storage upsert before `profiles.avatar_path` metadata is linked.
 - Remote migrations `0025`–`0027` are applied. The targeted private-social verifier passed owner write, replacement, friend signed read, outsider denial, and cleanup once after the repair.
 - `android:build:verify` now supplies a process-only public HTTPS placeholder. Local Android development still uses the configured LAN URL, and production rejects HTTP/private addresses.
-- A later four-viewer remote verifier attempt was blocked by Supabase anonymous-auth rate limiting; no further anonymous accounts were created.
+- The four-viewer profile/privacy verifier now passes owner, accepted friend, shared-Group member, outsider, hidden-field omission, and blocked-access coverage.
