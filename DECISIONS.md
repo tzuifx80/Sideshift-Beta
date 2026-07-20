@@ -25,3 +25,10 @@
 - The active introduction now follows welcome → debate choice → SideSwitch → personalize; it remains skippable, resumable, keyboard-safe, and re-openable without erasing preferences.
 - Profile photo replacement keeps the private `current.webp` object path but increments a client-only avatar revision. The shared profile-avatar snapshot appends that revision to signed image URLs, so header/profile state updates immediately without disabling normal caching or making the bucket public.
 - The mobile surface uses shared responsive tokens, 16px form text, 44–48px controls, safe-area padding, compact editorial cards, and a five-destination bottom navigation. No architecture or migration changes were introduced.
+
+## 2026-07-20 Avatar Storage RLS and build preconditions
+
+- Avatar Storage authorization uses exact owner path equality for `<public_profile_key>/current.webp`; INSERT, UPDATE, and DELETE never accept arbitrary keys or path traversal.
+- Storage SELECT keeps the bucket private, grants the owner an exact-path transition read needed by `upsert`, and routes every non-owner read through `can_view_profile_avatar`.
+- Applied migrations `0025`–`0027` repair the remote policy without rewriting `0001`–`0024`.
+- Production Android verification uses a process-only `https://api.example.invalid` placeholder. Local `.env` development values remain untouched.

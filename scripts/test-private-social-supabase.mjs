@@ -59,8 +59,11 @@ assert(Boolean(forcedAcceptance.error) || forcedAcceptance.data?.length === 0, '
 const avatarBytes = Buffer.from('UklGRiIAAABXRUJQVlA4TAYAAAAvAAAAAAfQ//73v/+BiOh/AAA=', 'base64')
 const avatarPath = `${aKey}/current.webp`
 const avatarUpload = await a.client.storage.from('profile-avatars').upload(avatarPath, avatarBytes, { contentType: 'image/webp', upsert: true })
-if (avatarUpload.error) fail(`avatar upload failed: ${avatarUpload.error.message}`)
-const avatarMetadata = await a.client.rpc('set_my_avatar_path', { p_object_path: avatarPath, p_mime_type: 'image/webp', p_byte_size: avatarBytes.length })
+if (avatarUpload.error) fail(`avatar initial upload failed: ${avatarUpload.error.message}`)
+const avatarReplacementBytes = Buffer.concat([avatarBytes, Buffer.from([0])])
+const avatarReplacement = await a.client.storage.from('profile-avatars').upload(avatarPath, avatarReplacementBytes, { contentType: 'image/webp', upsert: true })
+if (avatarReplacement.error) fail(`avatar replacement failed: ${avatarReplacement.error.message}`)
+const avatarMetadata = await a.client.rpc('set_my_avatar_path', { p_object_path: avatarPath, p_mime_type: 'image/webp', p_byte_size: avatarReplacementBytes.length })
 if (avatarMetadata.error) fail(`avatar metadata failed: ${avatarMetadata.error.message}`)
 const ownerUrl = await a.client.storage.from('profile-avatars').createSignedUrl(avatarPath, 60)
 if (ownerUrl.error || !ownerUrl.data?.signedUrl) fail('avatar owner could not create a signed read')

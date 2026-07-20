@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Repaired private avatar Storage RLS across migrations `0025`–`0027`: owner create/replace/remove is canonical-path-only, friend reads remain privacy-gated, and outsider direct access remains denied.
+- Added `android:build:verify` for a process-only HTTPS placeholder build while preserving local LAN development configuration and production URL rejection.
+
 - Stabilized SideShift Basic multi-turn submissions, retries, stale-response handling, lifecycle interruption, safe diagnostics, and invalid-response recovery.
 - Added three-turn Basic provider regression coverage and expanded the live verifier to three turns plus evaluation.
 - Routed Friends profile photos through the shared picker and 512px WebP processing path.

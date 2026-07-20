@@ -39,7 +39,8 @@
     "cap:open": "npx cap open android",
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
-    "android:build": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug"
+    "android:build": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug",
+    "android:build:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-android-build.ps1"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

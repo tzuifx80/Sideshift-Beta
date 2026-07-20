@@ -1,5 +1,8 @@
 # Known limitations
 
+- The four-viewer profile/privacy verifier could not be rerun after the avatar policy repair because Supabase anonymous-auth rate limiting activated; the targeted private-social verifier passed once after the repair, and no further anonymous signups were attempted.
+- `npx supabase db lint --linked --fail-on error` still reports the pre-existing `pg_catalog.trim(text)` error in `complete_challenge_response` and an unused `p_points` warning; this repair did not alter those unrelated functions.
+
 - `adb` is not installed in this workspace, so the debug APK could not be installed or exercised on an emulator/device.
 - Physical Android gallery/camera, permission recovery, keyboard, rotation, Back, reconnect, deep-link and native-share checks remain manual.
 - `npm run verify:providers:live` reaches the three-turn Basic and evaluation checks, then fails at the existing feedback-email delivery assertion (`delivery_status: failed` instead of `sent`).
