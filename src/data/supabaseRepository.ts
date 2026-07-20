@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { getTake, type DebateSnapshot, type Language, type ResultData, type Stance } from '../domain'
+import { normalizePreferences } from '../profile'
 import { challengeRecordSchema, debateSnapshotSchema, resultDataSchema, teamDebateSessionSchema } from './schemas'
 import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput, ReportRecord, RepositoryError } from './repository'
 import { RepositoryError as RepositoryErrorClass } from './repository'
@@ -11,7 +12,33 @@ type TableRow = Record<string, unknown>
 type SupabaseFailure = { code?: string; message?: string; details?: string }
 
 const languageSchema = z.enum(['en', 'de', 'fr', 'es', 'it'])
-const preferencesRowSchema = z.object({ user_id: z.string().uuid(), topic_preferences: z.unknown(), debate_languages: z.unknown(), intensity: z.string().nullable(), preferred_mode: z.enum(['classic', 'sideswitch', 'blindside', 'commonground']), preferred_ai_style: z.string().nullable(), preferred_opponent_type: z.enum(['ask', 'ai', 'person']).default('ask'), preferred_ai_family: z.enum(['Gemini', 'Claude', 'GPT', 'DeepSeek']).default('GPT'), preferred_opponent_id: z.string(), preferred_ai_model_id: z.string().nullable().default(null), ai_difficulty: z.enum(['beginner', 'intermediate', 'advanced', 'expert']), ai_round_length: z.enum(['quick', 'standard', 'deep']), ai_quality: z.enum(['fast', 'balanced', 'maximum']).default('balanced'), ai_response_length: z.enum(['concise', 'standard', 'detailed']).default('standard'), show_model_details: z.boolean().default(false), theme: z.enum(['system', 'light', 'dark']), accent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), reduced_motion: z.boolean(), text_size: z.enum(['compact', 'comfortable']), share_real_stance: z.boolean(), onboarding_completed: z.boolean(), onboarding_stage: z.number().int().min(0).max(3).default(0), onboarding_goal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']).default('reasoning'), onboarding_dismissed: z.boolean().default(false) })
+const preferenceArrayValueSchema = z.union([z.array(z.unknown()), z.string(), z.null()]).optional()
+const preferencesRowSchema = z.object({
+  user_id: z.string().uuid(),
+  topic_preferences: preferenceArrayValueSchema,
+  debate_languages: preferenceArrayValueSchema,
+  intensity: z.string().nullable().optional(),
+  preferred_mode: z.enum(['classic', 'sideswitch', 'blindside', 'commonground']).nullable().optional(),
+  preferred_ai_style: z.string().nullable().optional(),
+  preferred_opponent_type: z.enum(['ask', 'ai', 'person']).nullable().optional(),
+  preferred_ai_family: z.enum(['Gemini', 'Claude', 'GPT', 'DeepSeek']).nullable().optional(),
+  preferred_opponent_id: z.string().nullable().optional(),
+  preferred_ai_model_id: z.string().nullable().optional(),
+  ai_difficulty: z.enum(['beginner', 'intermediate', 'advanced', 'expert']).nullable().optional(),
+  ai_round_length: z.enum(['quick', 'standard', 'deep']).nullable().optional(),
+  ai_quality: z.enum(['fast', 'balanced', 'maximum']).nullable().optional(),
+  ai_response_length: z.enum(['concise', 'standard', 'detailed']).nullable().optional(),
+  show_model_details: z.boolean().nullable().optional(),
+  theme: z.enum(['system', 'light', 'dark']).nullable().optional(),
+  accent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']).nullable().optional(),
+  reduced_motion: z.boolean().nullable().optional(),
+  text_size: z.enum(['compact', 'comfortable']).nullable().optional(),
+  share_real_stance: z.boolean().nullable().optional(),
+  onboarding_completed: z.boolean().nullable().optional(),
+  onboarding_stage: z.number().int().nullable().optional(),
+  onboarding_goal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']).nullable().optional(),
+  onboarding_dismissed: z.boolean().nullable().optional(),
+}).passthrough()
 const profilePreviewSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPath: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), visibleStats: z.record(z.string(), z.boolean()) })
 const privateProfileSchema = z.object({ profileKey: z.string().uuid(), handle: z.string().nullable(), friendCode: z.string().nullable(), displayName: z.string().nullable(), bio: z.string().nullable(), avatarPreset: z.enum(['orbit', 'spark', 'wave', 'sun', 'leaf']), avatarPath: z.string().nullable(), profileAccent: z.enum(['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral']), profileVisibility: z.enum(['friends', 'shared_groups', 'private']), avatarVisibility: z.enum(['friends', 'shared_groups', 'private']), visibleStats: z.record(z.string(), z.boolean()), interfaceLanguage: languageSchema, challengeShowName: z.boolean(), shareRealStance: z.boolean() })
 const friendshipSchema = z.object({ id: z.string().uuid(), status: z.enum(['pending', 'accepted', 'declined', 'cancelled', 'removed', 'blocked']), direction: z.enum(['incoming', 'outgoing']), profile: profilePreviewSchema.nullable() })
@@ -21,6 +48,125 @@ const reportRowSchema = z.object({ id: z.string(), status: z.string(), created_a
 
 function asRow(value: unknown): TableRow {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as TableRow : {}
+}
+
+const preferenceFieldAliases: Record<string, string> = {
+  user_id: 'userId',
+  topic_preferences: 'topicPreferences',
+  debate_languages: 'debateLanguages',
+  intensity: 'intensity',
+  preferred_mode: 'preferredMode',
+  preferred_ai_style: 'preferredAiStyle',
+  preferred_opponent_type: 'preferredOpponentType',
+  preferred_ai_family: 'preferredAiFamily',
+  preferred_opponent_id: 'preferredOpponentId',
+  preferred_ai_model_id: 'preferredAiModelId',
+  ai_difficulty: 'aiDifficulty',
+  ai_round_length: 'aiRoundLength',
+  ai_quality: 'aiQuality',
+  ai_response_length: 'aiResponseLength',
+  show_model_details: 'showModelDetails',
+  theme: 'theme',
+  accent: 'accent',
+  reduced_motion: 'reducedMotion',
+  text_size: 'textSize',
+  share_real_stance: 'shareRealStance',
+  onboarding_completed: 'onboardingCompleted',
+  onboarding_stage: 'onboardingStage',
+  onboarding_goal: 'onboardingGoal',
+  onboarding_dismissed: 'onboardingDismissed',
+}
+
+function valueType(value: unknown): string {
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'array'
+  return typeof value
+}
+
+export function getPreferenceStructureDiagnostics(value: unknown, issuePaths: ReadonlyArray<ReadonlyArray<PropertyKey>> = []) {
+  const row = asRow(value)
+  const fieldTypes: Record<string, string> = {}
+  const missingFields: string[] = []
+  const nullFields: string[] = []
+  for (const [snake, camel] of Object.entries(preferenceFieldAliases)) {
+    const field = Object.prototype.hasOwnProperty.call(row, snake) ? snake : Object.prototype.hasOwnProperty.call(row, camel) ? camel : null
+    if (!field) { missingFields.push(snake); continue }
+    fieldTypes[snake] = valueType(row[field])
+    if (row[field] === null) nullFields.push(snake)
+  }
+  return { fieldTypes, missingFields, nullFields, issuePaths: issuePaths.map(path => path.map(String)) }
+}
+
+function canonicalizePreferenceRow(value: unknown): TableRow {
+  const row = asRow(value)
+  const canonical: TableRow = {}
+  for (const [snake, camel] of Object.entries(preferenceFieldAliases)) {
+    if (Object.prototype.hasOwnProperty.call(row, snake)) canonical[snake] = row[snake]
+    else if (Object.prototype.hasOwnProperty.call(row, camel)) canonical[snake] = row[camel]
+  }
+  return canonical
+}
+
+class PreferenceShapeError extends Error {
+  constructor(readonly field: string) {
+    super(`Invalid preference field: ${field}`)
+  }
+}
+
+function decodeStringArray(value: unknown, field: string): string[] {
+  if (value === null || value === undefined) return []
+  let decoded = value
+  if (typeof value === 'string') {
+    try { decoded = JSON.parse(value) } catch { throw new PreferenceShapeError(field) }
+  }
+  if (!Array.isArray(decoded) || decoded.some(item => typeof item !== 'string')) throw new PreferenceShapeError(field)
+  return decoded as string[]
+}
+
+function rejectPreferenceData(value: unknown, issuePaths: ReadonlyArray<ReadonlyArray<PropertyKey>> = []): never {
+  // Deliberately log structure only: no values, identifiers, interests, or private content.
+  console.warn('[Supabase preferences] rejected', getPreferenceStructureDiagnostics(value, issuePaths))
+  throw new RepositoryErrorClass('validation', 'Your private preferences could not be loaded.')
+}
+
+export function parseSupabasePreferences(value: unknown, userId: string): UserPreferences {
+  const canonical = canonicalizePreferenceRow(value)
+  const parsed = preferencesRowSchema.safeParse(canonical)
+  if (!parsed.success) return rejectPreferenceData(value, parsed.error.issues.map(issue => issue.path))
+  if (parsed.data.user_id !== userId) return rejectPreferenceData(value, [['user_id']])
+  try {
+    const row = parsed.data
+    const debateLanguages = decodeStringArray(row.debate_languages, 'debate_languages').filter((item): item is Language => item === 'en' || item === 'de' || item === 'fr' || item === 'es' || item === 'it')
+    return normalizePreferences({
+      userId,
+      topicPreferences: decodeStringArray(row.topic_preferences, 'topic_preferences'),
+      debateLanguages: debateLanguages.length ? debateLanguages : ['en'],
+      intensity: row.intensity ?? undefined,
+      preferredMode: row.preferred_mode ?? undefined,
+      preferredAiStyle: row.preferred_ai_style ?? undefined,
+      preferredOpponentType: row.preferred_opponent_type ?? undefined,
+      preferredAiFamily: row.preferred_ai_family ?? undefined,
+      preferredOpponentId: row.preferred_opponent_id ?? undefined,
+      preferredAiModelId: row.preferred_ai_model_id ?? null,
+      aiDifficulty: row.ai_difficulty ?? undefined,
+      aiRoundLength: row.ai_round_length ?? undefined,
+      aiQuality: row.ai_quality ?? undefined,
+      aiResponseLength: row.ai_response_length ?? undefined,
+      showModelDetails: row.show_model_details === true,
+      theme: row.theme ?? undefined,
+      accent: row.accent ?? undefined,
+      reducedMotion: row.reduced_motion === true,
+      textSize: row.text_size ?? undefined,
+      shareRealStance: row.share_real_stance === true,
+      onboardingCompleted: row.onboarding_completed === true,
+      onboardingStage: row.onboarding_stage ?? undefined,
+      onboardingGoal: row.onboarding_goal ?? undefined,
+      onboardingDismissed: row.onboarding_dismissed === true,
+    })
+  } catch (caught) {
+    const issuePaths = caught instanceof PreferenceShapeError ? [[caught.field]] : caught instanceof z.ZodError ? caught.issues.map(issue => issue.path) : []
+    return rejectPreferenceData(value, issuePaths)
+  }
 }
 
 export function mapSupabaseError(operation: string, error: SupabaseFailure): RepositoryError {
@@ -181,34 +327,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     const { data, error } = await client.from('user_preferences').select('user_id,topic_preferences,debate_languages,intensity,preferred_mode,preferred_ai_style,preferred_opponent_type,preferred_ai_family,preferred_opponent_id,preferred_ai_model_id,ai_difficulty,ai_round_length,ai_quality,ai_response_length,show_model_details,theme,accent,reduced_motion,text_size,share_real_stance,onboarding_completed,onboarding_stage,onboarding_goal,onboarding_dismissed').eq('user_id', userId).maybeSingle()
     if (error) throw mapSupabaseError('loading your preferences', error)
     if (!data) return null
-    const parsed = preferencesRowSchema.safeParse(data)
-    if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid preference data.')
-    return {
-      userId: parsed.data.user_id,
-      topicPreferences: Array.isArray(parsed.data.topic_preferences) ? parsed.data.topic_preferences.filter((item): item is string => typeof item === 'string') : [],
-      debateLanguages: Array.isArray(parsed.data.debate_languages) ? parsed.data.debate_languages.filter((item): item is Language => item === 'en' || item === 'de' || item === 'fr' || item === 'es' || item === 'it') : ['en'],
-      intensity: parsed.data.intensity,
-      preferredMode: parsed.data.preferred_mode,
-      preferredAiStyle: parsed.data.preferred_ai_style,
-      preferredOpponentType: parsed.data.preferred_opponent_type,
-      preferredAiFamily: parsed.data.preferred_ai_family,
-      preferredOpponentId: parsed.data.preferred_opponent_id,
-      preferredAiModelId: parsed.data.preferred_ai_model_id,
-      aiDifficulty: parsed.data.ai_difficulty,
-      aiRoundLength: parsed.data.ai_round_length,
-      aiQuality: parsed.data.ai_quality,
-      aiResponseLength: parsed.data.ai_response_length,
-      showModelDetails: parsed.data.show_model_details,
-      theme: parsed.data.theme,
-      accent: parsed.data.accent,
-      reducedMotion: parsed.data.reduced_motion,
-      textSize: parsed.data.text_size,
-      shareRealStance: parsed.data.share_real_stance,
-      onboardingCompleted: parsed.data.onboarding_completed,
-      onboardingStage: parsed.data.onboarding_stage,
-      onboardingGoal: parsed.data.onboarding_goal,
-      onboardingDismissed: parsed.data.onboarding_dismissed,
-    }
+    return parseSupabasePreferences(data, userId)
   }
 
   async function savePreferences(preferences: UserPreferences): Promise<void> {
