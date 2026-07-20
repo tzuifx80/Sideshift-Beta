@@ -21,10 +21,11 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 
 ## Important limitations
 
+- Added `scripts/private_social_flow.py` and `npm run test:playwright:private-social` for the focused three-context browser acceptance flow. The run reached the exact-handle lookup and pending-request path, but final remote execution was stopped after Supabase anonymous-auth rate limiting reported `Private session unavailable / Request rate limit reached` for the third isolated context. No further anonymous-auth retries were performed.
 - Physical Android camera/gallery verification remains pending; the web path uses browser-native canvas processing and the existing Capacitor foundation is not changed.
-- The new Friends screen is covered by remote three-user RPC/RLS acceptance; a dedicated browser flow for its visual interaction remains future test coverage.
+- The focused Friends browser flow is implemented but remains remotely unverified because anonymous authentication rate limiting blocked the final run. The earlier three-user RPC/RLS acceptance remains passing.
 - The repository still contains existing bundle warnings unrelated to this phase.
 
 ## Exact next action
 
-Inspect the final diff for the bounded migration/repository/UI scope, then commit the non-secret changes and verify a clean working tree.
+Run the blocked remote browser/RLS checks only after Supabase anonymous-auth rate limits clear, then verify the committed tree remains clean.

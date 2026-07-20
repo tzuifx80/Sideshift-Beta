@@ -26,6 +26,7 @@
     "test:playwright:explore": "python scripts/explore_ai_flow.py",
     "test:playwright:ai": "python scripts/ai_mock_flow.py",
     "test:playwright:person": "python scripts/person_flow_test.py",
+    "test:playwright:private-social": "python scripts/private_social_flow.py",
     "test:playwright:team": "python scripts/team_group_flow.py",
     "test:playwright:team-ai": "python scripts/team_ai_review_flow.py",
     "test:playwright:supabase": "python scripts/supabase_challenge_flow.py",
