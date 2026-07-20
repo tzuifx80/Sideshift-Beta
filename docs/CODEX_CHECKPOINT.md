@@ -36,3 +36,15 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 ## Exact next action
 
 Configure the ignored physical-device API URL, rebuild/sync Android, then manually retest Basic and profile media on a physical device with a valid existing session.
+
+## Android beta checkpoint — 2026-07-20
+
+- Basic client turn preparation now uses stable, header-safe `debateId`/round identities, a single-flight submission guard, stale-response rejection, invalid-response validation, and recoverable retry state.
+- Android lifecycle backgrounding invalidates the active response and preserves the submitted user turn; resume clears the cached connection promise.
+- The live provider verifier was expanded to three Basic turns and one evaluation. The Basic path passed; the run still stops at the pre-existing feedback-email delivery assertion.
+- Development web assets were synced and `android/app/build/outputs/apk/debug/app-debug.apk` was built successfully. `adb` is unavailable, so installation and physical Android checks remain pending.
+- The shared system picker/media processor is used by both Settings and Friends. Only `@capacitor/app`, `@capacitor/browser`, and `@capacitor/share` are installed; Capacitor Camera was not added.
+
+### Exact next action
+
+Install `app-debug.apk` on an emulator or physical device with `adb`, run the three-turn Basic/lifecycle/navigation/keyboard smoke matrix, then perform the gallery and camera-or-gallery system-picker checks with a valid ignored API URL.

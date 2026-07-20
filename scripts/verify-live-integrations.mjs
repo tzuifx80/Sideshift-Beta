@@ -69,30 +69,46 @@ try {
   const usageBefore = await usageRow()
 
   const debateId = randomUUID()
-  const requestId = `live-turn-${randomUUID()}`
-  const turnBody = {
-    modelId: 'sideshift-basic',
-    messages: [
-      { role: 'system', content: 'Language: German. Selected take: Die Stadt sollte mehr Fahrradwege bauen, weil sie Sicherheit erhöhen und Staus reduzieren. Assigned side: Support the motion. Keep this side.' },
-      { role: 'user', content: 'Ich unterstütze den Ausbau von Fahrradwegen, weil sichere Radwege den Verkehr entlasten und Menschen eine praktische Alternative zum Auto geben.' },
-    ],
-    maxTokens: 120,
-    debateId,
-    round: 1,
+  const systemContent = 'Language: German. Selected take: Die Stadt sollte mehr Fahrradwege bauen, weil sie Sicherheit erhöhen und Staus reduzieren. Assigned side: Support the motion. Keep this side.'
+  const argumentsByRound = [
+    'Ich unterstütze den Ausbau von Fahrradwegen, weil sichere Radwege den Verkehr entlasten und Menschen eine praktische Alternative zum Auto geben.',
+    'Auch für Lieferverkehr und ältere Menschen kann eine sichere, getrennte Infrastruktur den öffentlichen Raum besser organisieren und Konflikte reduzieren.',
+    'Die Stadt sollte den Ausbau mit messbaren Sicherheitszielen, einer fairen Kostenplanung und einer schrittweisen Prüfung der Auswirkungen begleiten.',
+  ]
+  const turnBodies = []
+  const turnRequestIds = []
+  const turnResponses = []
+  for (const [index, argument] of argumentsByRound.entries()) {
+    const round = index + 1
+    const body = {
+      modelId: 'sideshift-basic',
+      messages: [
+        { role: 'system', content: systemContent },
+        ...turnBodies.flatMap((previous, previousIndex) => [{ role: 'user', content: previous.messages.at(-1).content }, { role: 'assistant', content: turnResponses[previousIndex].response }]),
+        { role: 'user', content: argument },
+      ],
+      maxTokens: 120,
+      debateId,
+      round,
+    }
+    const requestId = `live-turn-${round}-${randomUUID()}`
+    const response = await api('/api/ai/basic/opponent', { method: 'POST', headers: { 'x-request-id': requestId }, body: JSON.stringify(body) })
+    assert.equal(response.language, 'de')
+    assert.ok(typeof response.response === 'string' && response.response.length > 0)
+    assert.ok(response.response.length <= 700)
+    assert.ok(wordCount(response.response) <= 160)
+    if (round === 1) assert.ok(['Fahrrad', 'Rad', 'Sicherheit', 'Stau', 'Verkehr'].some(keyword => response.response.includes(keyword)), 'Basic response did not address the supplied argument')
+    turnBodies.push(body)
+    turnRequestIds.push(requestId)
+    turnResponses.push(response)
   }
-  const firstTurn = await api('/api/ai/basic/opponent', { method: 'POST', headers: { 'x-request-id': requestId }, body: JSON.stringify(turnBody) })
-  assert.equal(firstTurn.language, 'de')
-  assert.ok(typeof firstTurn.response === 'string' && firstTurn.response.length > 0)
-  assert.ok(firstTurn.response.length <= 700)
-  assert.ok(wordCount(firstTurn.response) <= 160)
-  assert.ok(['Fahrrad', 'Rad', 'Sicherheit', 'Stau', 'Verkehr'].some(keyword => firstTurn.response.includes(keyword)), 'Basic response did not address the supplied argument')
 
   const usageAfterTurn = await usageRow()
-  assert.equal(usageAfterTurn.turns_generated, usageBefore.turns_generated + 1)
+  assert.equal(usageAfterTurn.turns_generated, usageBefore.turns_generated + 3)
   assert.equal(usageAfterTurn.debates_started, usageBefore.debates_started + 1)
 
-  const replayTurn = await api('/api/ai/basic/opponent', { method: 'POST', headers: { 'x-request-id': requestId }, body: JSON.stringify(turnBody) })
-  assert.deepEqual(replayTurn, firstTurn)
+  const replayTurn = await api('/api/ai/basic/opponent', { method: 'POST', headers: { 'x-request-id': turnRequestIds[0] }, body: JSON.stringify(turnBodies[0]) })
+  assert.deepEqual(replayTurn, turnResponses[0])
   const usageAfterReplay = await usageRow()
   assert.deepEqual(usageAfterReplay, usageAfterTurn)
 
@@ -102,7 +118,7 @@ try {
     debateId,
     messages: [
       { role: 'system', content: 'Language: German. Evaluate only debate technique. Return the requested structured evaluation.' },
-      { role: 'user', content: JSON.stringify([{ role: 'user', round: 1, content: turnBody.messages[1].content }, { role: 'opponent', round: 1, content: firstTurn.response }]) },
+      { role: 'user', content: JSON.stringify(turnBodies.flatMap((body, index) => [{ role: 'user', round: body.round, content: body.messages.at(-1).content }, { role: 'opponent', round: body.round, content: turnResponses[index].response }])) },
     ],
   }
   const evaluationResult = await api('/api/ai/basic/evaluate', { method: 'POST', headers: { 'x-request-id': evaluationRequestId }, body: JSON.stringify(evaluationBody) })

@@ -17,7 +17,7 @@ export type AiErrorCode =
   | 'unknown'
 
 export class AiProviderError extends Error {
-  constructor(public readonly code: AiErrorCode, message: string, public readonly retryable = false) {
+  constructor(public readonly code: AiErrorCode, message: string, public readonly retryable = false, public readonly status?: number) {
     super(message)
     this.name = 'AiProviderError'
   }

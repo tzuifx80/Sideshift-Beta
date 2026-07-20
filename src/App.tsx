@@ -391,7 +391,10 @@ function App() {
   function notify(message: string) { setToast(message) }
   useEffect(() => { registerServiceWorker(); void initializeCapacitorBridge() }, [])
   useEffect(() => {
-    const handleNativeBack = () => setScreen(current => current === 'aiDebate' || current === 'debate' || current === 'team' || current === 'groups' ? 'home' : current === 'aiSetup' || current === 'debateChoice' || current === 'clash' ? 'home' : current)
+    const handleNativeBack = (event: Event) => {
+      if (event.defaultPrevented) return
+      setScreen(current => current === 'aiDebate' || current === 'debate' || current === 'team' || current === 'groups' ? 'home' : current === 'aiSetup' || current === 'debateChoice' || current === 'clash' ? 'home' : current)
+    }
     window.addEventListener('sideshift-native-back', handleNativeBack)
     return () => window.removeEventListener('sideshift-native-back', handleNativeBack)
   }, [])

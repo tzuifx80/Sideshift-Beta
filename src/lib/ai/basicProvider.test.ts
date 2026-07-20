@@ -35,4 +35,33 @@ describe('SideShift Basic provider', () => {
     const provider = createBasicAiProvider({ fetcher: fetcher as typeof fetch, userId: 'user-1' })
     await expect(provider.getStatus()).resolves.toBe('failed')
   })
+
+  it('completes three distinct turns with distinct request identities', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ available: true, usage: { allowed: true, debatesRemaining: 3, turnsRemaining: 3 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ response: 'First response.' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ response: 'Second response.' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ response: 'Third response.' }), { status: 200 }))
+    const provider = createBasicAiProvider({ fetcher: fetcher as typeof fetch, userId: 'user-1', apiConfig: { mode: 'development', platform: 'android', apiBaseUrl: 'http://192.0.2.10:8787' } })
+    await provider.getStatus()
+    for (const [round, content] of [[1, 'First argument with enough detail.'], [2, 'Second argument with enough detail.'], [3, 'Third argument with enough detail.']] as const) {
+      const stream = await provider.streamChat({ modelId: 'sideshift-basic', messages: [{ role: 'user', content }], maxTokens: 120, debateId: 'debate-1', round, requestId: `debate-1-turn-${round}` })
+      for await (const _chunk of stream.chunks) { /* collect the completed response */ }
+    }
+    expect(fetcher.mock.calls.slice(1).map(call => call[1]?.headers)).toEqual([
+      expect.objectContaining({ 'x-request-id': 'debate-1-turn-1' }),
+      expect.objectContaining({ 'x-request-id': 'debate-1-turn-2' }),
+      expect.objectContaining({ 'x-request-id': 'debate-1-turn-3' }),
+    ])
+    expect(fetcher.mock.calls.slice(1).map(call => JSON.parse(String(call[1]?.body)).round)).toEqual([1, 2, 3])
+  })
+
+  it('rejects an invalid opponent response instead of leaving an empty stream', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ available: true, usage: { allowed: true, debatesRemaining: 3, turnsRemaining: 3 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ response: '' }), { status: 200 }))
+    const provider = createBasicAiProvider({ fetcher: fetcher as typeof fetch, userId: 'user-1', apiConfig: { mode: 'development', platform: 'android', apiBaseUrl: 'http://192.0.2.10:8787' } })
+    await provider.getStatus()
+    await expect(provider.streamChat({ modelId: 'sideshift-basic', messages: [{ role: 'user', content: 'An argument with enough detail.' }], maxTokens: 120, debateId: 'debate-1', round: 1, requestId: 'debate-1-turn-1' })).rejects.toMatchObject({ code: 'invalid_response' })
+  })
 })

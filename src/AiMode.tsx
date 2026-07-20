@@ -4,6 +4,7 @@ import { buildDebateContext, validateCustomMotion, type ContextTurn } from './li
 import { normalizeAiError } from './lib/ai/errors'
 import { resolveOpponents } from './lib/ai/modelResolver'
 import { basicOpponent, opponents } from './lib/ai/opponents'
+import { diagnoseBasicTurn, prepareBasicTurn, shouldAcceptBasicTurnResponse } from './lib/ai/turnState'
 import type { AiFeedbackType, AiModelSelection, AiProvider, AiStartConfig, ResolvedOpponent } from './lib/ai/types'
 import type { UserPreferences } from './data/types'
 import { clearAiSetupDraft, clearArgumentDraft, loadAiSetupDraft, loadArgumentDraft, saveAiSetupDraft, saveArgumentDraft, type AiSetupDraft } from './drafts'
@@ -166,12 +167,38 @@ export function AiDebate({ provider, take, language, config, snapshot, draftId, 
   const [error, setError] = useState('')
   const streamRef = useRef<{ stop: () => void } | null>(null)
   const requestRef = useRef('')
+  const submissionRef = useRef(false)
+  const generationRef = useRef(generation)
   const mountedRef = useRef(true)
   const snapshotRef = useRef(snapshot)
   const reconnectRef = useRef<Promise<void> | null>(null)
+  const providerRef = useRef(provider)
   const draftKey = `ai:${draftId}`
   useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
+  useEffect(() => { generationRef.current = generation }, [generation])
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; streamRef.current?.stop() } }, [])
+  useEffect(() => {
+    if (providerRef.current !== provider) {
+      providerRef.current = provider
+      reconnectRef.current = null
+    }
+  }, [provider])
+  useEffect(() => {
+    const handleLifecycle = (event: Event) => {
+      const active = (event as CustomEvent<{ isActive?: boolean }>).detail?.isActive
+      if (active === true) { reconnectRef.current = null; return }
+      if (active !== false || generationRef.current !== 'streaming') return
+      const requestId = requestRef.current
+      requestRef.current = ''
+      streamRef.current?.stop()
+      streamRef.current = null
+      setGenerationState('interrupted')
+      diagnoseBasicTurn({ round: Math.max(0, ...snapshotRef.current.transcript.map(turn => turn.round)), requestId, phase: 'lifecycle', outcome: 'backgrounded' })
+      publish({ ...snapshotRef.current, interrupted: true, completionReason: 'interrupted' })
+    }
+    window.addEventListener('sideshift-lifecycle', handleLifecycle)
+    return () => window.removeEventListener('sideshift-lifecycle', handleLifecycle)
+  }, [])
   useEffect(() => {
     if (argument) return
     const restored = loadArgumentDraft(draftKey)
@@ -192,37 +219,55 @@ export function AiDebate({ provider, take, language, config, snapshot, draftId, 
     await reconnectRef.current
   }
   function publish(next: AiDebateData) { snapshotRef.current = next; onSnapshot(next) }
+  function setGenerationState(next: 'idle' | 'streaming' | 'interrupted' | 'error') { generationRef.current = next; setGeneration(next) }
   const latestTurn = snapshot.transcript[snapshot.transcript.length - 1]
   const pendingUser = latestTurn?.role === 'user'
   const currentRound = Math.max(0, ...snapshot.transcript.map(turn => turn.round))
   const aiTurns = snapshot.transcript.filter(turn => turn.role === 'opponent')
   const completeReady = !pendingUser && aiTurns.length >= snapshot.roundLimit
   const displayMotion = snapshot.customMotion || takeText(take, language).statement
-  async function streamReply(transcript: AiDebateData['transcript'], round: number, latestArgument: string) {
-    const requestId = `${Date.now()}-${Math.random()}`
-    requestRef.current = requestId; setGeneration('streaming'); setError('')
+  async function streamReply(transcript: AiDebateData['transcript'], round: number, latestArgument: string, requestId: string) {
+    requestRef.current = requestId; setGenerationState('streaming'); setError('')
+    diagnoseBasicTurn({ round, requestId, phase: 'submit', outcome: 'started' })
     publish({ ...snapshotRef.current, transcript, partialResponse: '', interrupted: false, completionReason: null })
     const contextTurns: ContextTurn[] = transcript.slice(0, -1).map(turn => ({ role: turn.role === 'opponent' ? 'assistant' : 'user', content: turn.content, round: turn.round }))
     try {
+      diagnoseBasicTurn({ round, requestId, phase: 'connect' })
       await ensureConnected()
       const stream = await provider.streamChat({ modelId: config.opponent.model?.id || '', messages: buildDebateContext({ motion: displayMotion, userSide: config.userSide, aiSide: config.aiSide, language, difficulty: config.difficulty, roundLength: config.roundLength, round, latestArgument, recentTurns: contextTurns, stylePrompt: config.opponent.stylePrompt }), maxTokens: responseTokenLimit(config.responseLength, config.opponent.maxResponseTokens), temperature: config.difficulty === 'expert' ? .25 : .4, debateId: draftId, round, requestId })
-      if (!mountedRef.current || requestRef.current !== requestId) { stream.stop(); return }
+      if (!mountedRef.current || !shouldAcceptBasicTurnResponse({ expectedRequestId: requestRef.current, requestId })) { diagnoseBasicTurn({ round, requestId, phase: 'response', outcome: 'stale' }); stream.stop(); streamRef.current = null; return }
+      diagnoseBasicTurn({ round, requestId, phase: 'response', outcome: 'accepted' })
       streamRef.current = stream; let partial = ''
-      for await (const chunk of stream.chunks) { if (!mountedRef.current || requestRef.current !== requestId) { stream.stop(); return }; partial += chunk; publish({ ...snapshotRef.current, transcript, partialResponse: partial, interrupted: false, completionReason: null }) }
-      if (!mountedRef.current || requestRef.current !== requestId) return
+      for await (const chunk of stream.chunks) { if (!mountedRef.current || !shouldAcceptBasicTurnResponse({ expectedRequestId: requestRef.current, requestId })) { diagnoseBasicTurn({ round, requestId, phase: 'chunk', outcome: 'stale' }); stream.stop(); streamRef.current = null; return }; partial += chunk; publish({ ...snapshotRef.current, transcript, partialResponse: partial, interrupted: false, completionReason: null }) }
+      if (!mountedRef.current || !shouldAcceptBasicTurnResponse({ expectedRequestId: requestRef.current, requestId })) { diagnoseBasicTurn({ round, requestId, phase: 'complete', outcome: 'stale' }); streamRef.current = null; return }
       streamRef.current = null
       if (!partial.trim()) throw new Error('The AI returned an empty response. Retry this round.')
-      publish({ ...snapshotRef.current, transcript: [...transcript, { role: 'opponent', round, content: partial.trim() }], partialResponse: '', interrupted: false, completionReason: null }); setGeneration('idle')
-    } catch (caught) { if (!mountedRef.current || requestRef.current !== requestId) return; streamRef.current = null; setGeneration('error'); const normalized = normalizeAiError(caught); setError(normalized.message); publish({ ...snapshotRef.current, transcript, partialResponse: snapshotRef.current.partialResponse, interrupted: true, completionReason: 'interrupted' }) }
+      publish({ ...snapshotRef.current, transcript: [...transcript, { role: 'opponent', round, content: partial.trim() }], partialResponse: '', interrupted: false, completionReason: null }); setGenerationState('idle')
+      diagnoseBasicTurn({ round, requestId, phase: 'complete', outcome: 'success' })
+    } catch (caught) {
+      if (!mountedRef.current || !shouldAcceptBasicTurnResponse({ expectedRequestId: requestRef.current, requestId })) { diagnoseBasicTurn({ round, requestId, phase: 'error', outcome: 'stale' }); return }
+      streamRef.current = null; const normalized = normalizeAiError(caught); setGenerationState('error'); setError(normalized.message); const status = caught && typeof caught === 'object' && 'status' in caught && typeof caught.status === 'number' ? caught.status : undefined; diagnoseBasicTurn({ round, requestId, phase: 'error', outcome: normalized.code, status }); publish({ ...snapshotRef.current, transcript, partialResponse: snapshotRef.current.partialResponse, interrupted: true, completionReason: 'interrupted' })
+    }
   }
   async function send() {
-    const trimmed = argument.trim()
-    if (generation === 'streaming' || (!pendingUser && trimmed.length < 12)) return
-    if (pendingUser) return void streamReply(snapshotRef.current.transcript, currentRound, latestTurn.content)
-    const next = [...snapshotRef.current.transcript, { role: 'user' as const, round: currentRound + 1, content: trimmed }]
-    clearArgumentDraft(draftKey); setArgument(''); await streamReply(next, currentRound + 1, trimmed)
+    if (submissionRef.current || generationRef.current === 'streaming') return
+    const prepared = prepareBasicTurn(snapshotRef.current, draftId, argument)
+    if (!prepared) return
+    submissionRef.current = true
+    if (prepared.transcript.length > snapshotRef.current.transcript.length) { clearArgumentDraft(draftKey); setArgument('') }
+    try { await streamReply(prepared.transcript, prepared.round, prepared.argument, prepared.requestId) } finally { submissionRef.current = false }
   }
-  function stop() { streamRef.current?.stop(); requestRef.current = ''; setGeneration('interrupted'); publish({ ...snapshotRef.current, interrupted: true, completionReason: 'interrupted' }); onNotify(t('ai.active.responseStopped')) }
+  function stop() { streamRef.current?.stop(); streamRef.current = null; requestRef.current = ''; setGenerationState('interrupted'); publish({ ...snapshotRef.current, interrupted: true, completionReason: 'interrupted' }); onNotify(t('ai.active.responseStopped')) }
+  useEffect(() => {
+    const handleNativeBack = (event: Event) => {
+      const activeElement = document.activeElement as HTMLElement | null
+      if (activeElement?.tagName === 'TEXTAREA' || activeElement?.tagName === 'INPUT') { activeElement.blur(); event.preventDefault(); return }
+      if (generationRef.current === 'streaming') { stop(); event.preventDefault(); return }
+      if (argument.trim() && !window.confirm(t('classic.exitConfirm'))) event.preventDefault()
+    }
+    window.addEventListener('sideshift-native-back', handleNativeBack, true)
+    return () => window.removeEventListener('sideshift-native-back', handleNativeBack, true)
+  }, [argument, t])
   function exitWithProtection() {
     if (argument.trim() && !window.confirm(t('classic.exitConfirm'))) return
     onExit()

@@ -6,7 +6,7 @@ export async function initializeCapacitorBridge(): Promise<void> {
   if (initialized || !Capacitor.isNativePlatform()) return
   initialized = true
   const { App } = await import('@capacitor/app')
-  await App.addListener('backButton', () => window.dispatchEvent(new Event('sideshift-native-back')))
+  await App.addListener('backButton', () => window.dispatchEvent(new Event('sideshift-native-back', { cancelable: true })))
   await App.addListener('appStateChange', state => window.dispatchEvent(new CustomEvent('sideshift-lifecycle', { detail: state })))
   await App.addListener('appUrlOpen', event => {
     try {

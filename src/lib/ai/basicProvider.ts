@@ -28,9 +28,15 @@ async function readJson<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({})) as { error?: { message?: string; code?: string } }
   if (!response.ok) {
     const code = payload.error?.code
-    throw new AiProviderError(code === 'rate_limited' ? 'rate_limited' : code === 'quota_exhausted' ? 'allowance_exhausted' : code === 'provider_unavailable' ? 'provider_unavailable' : 'request_failed', payload.error?.message || `SideShift Basic request failed (${response.status}).`)
+    throw new AiProviderError(code === 'rate_limited' ? 'rate_limited' : code === 'quota_exhausted' ? 'allowance_exhausted' : code === 'provider_unavailable' ? 'provider_unavailable' : 'request_failed', payload.error?.message || `SideShift Basic request failed (${response.status}).`, false, response.status)
   }
   return payload as T
+}
+
+function readOpponentResponse(payload: unknown): { response: string } {
+  const response = payload && typeof payload === 'object' ? (payload as { response?: unknown }).response : undefined
+  if (typeof response !== 'string' || !response.trim() || response.length > 700) throw new AiProviderError('invalid_response', 'SideShift Basic returned an invalid response.')
+  return { response: response.trim() }
 }
 
 export class BasicAiProvider implements AiProvider {
@@ -96,7 +102,7 @@ export class BasicAiProvider implements AiProvider {
       headers: headers(this.options, requestId),
       body: JSON.stringify({ modelId: request.modelId, messages: request.messages, maxTokens: Math.min(180, request.maxTokens), temperature: request.temperature ?? .35, debateId: request.debateId, round: request.round }),
     })
-    const output = await readJson<{ response: string }>(response)
+    const output = readOpponentResponse(await readJson<unknown>(response))
     let stopped = false
     return { requestId, chunks: (async function* () { if (!stopped && output.response) yield output.response })(), stop: () => { stopped = true } }
   }
