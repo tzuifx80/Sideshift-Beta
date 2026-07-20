@@ -1,6 +1,7 @@
 import type { BackendName, ProfileStats, RepositoryDiagnostics, SocialLink, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
-import type { DebateSnapshot, ResultData } from '../domain'
+import type { DebateSnapshot, ResultData, Language } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupSummary, TeamDebateSession } from '../collaboration'
+import type { WorldPulseItem, WorldPulseSource, WorldPulseTranslation } from '../worldPulse'
 
 export type ChallengeRecord = {
   id: string
@@ -74,6 +75,10 @@ export type ProfileView = {
 export type FriendshipRecord = { id: string; status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'removed' | 'blocked'; direction: 'incoming' | 'outgoing'; profile: ProfilePreview | null }
 export type FriendChallengeRecord = { id: string; takeId: string; mode: string; argument: string; creatorSide: string; status: 'open' | 'completed' | 'expired' | 'revoked'; expiresAt: string; response: string | null; result: { total: number } | null; direction: 'incoming' | 'outgoing'; creator: ProfilePreview | null; recipient: ProfilePreview | null }
 export type GroupFriendInvitation = { id: string; groupId: string; groupName: string; status: 'pending' | 'expired'; expiresAt: string; inviter: ProfilePreview | null }
+export type LeagueParticipant = { userId: string; displayName: string; points: number; awardCount: number }
+export type LeagueScoreEvent = { id: string; reason: string; points: number; occurredAt: string; category: string }
+export type LeagueDashboard = { available: boolean; joined: boolean; season: { id: string; startAt: string; endAt: string; status: string; scoringVersion: string; participantCount?: number } | null; participants: LeagueParticipant[]; myEvents: LeagueScoreEvent[]; awards: Array<{ userId: string; award: string }>; pastSeasons: Array<{ id: string; startAt: string; endAt: string; status: string; scoringVersion: string }> }
+export type WorldPulseDraftInput = { slug: string; headline: string; debateStatement: string; neutralContext: string; sideALabel: string; sideBLabel: string; category: string; countryCode: string | null; region: string | null; originalLanguage: Language; eventDate: string | null; publishAt: string | null; expiresAt: string | null; lastReviewedAt: string; sensitivity: 'standard' | 'sensitive' | 'high_sensitivity'; sources: WorldPulseSource[]; translations: Array<WorldPulseTranslation & { language: Language; isReviewed: boolean }> }
 
 export type AppRepository = {
   backend: BackendName
@@ -127,6 +132,15 @@ export type AppRepository = {
   joinGroupByInvite(userId: string, code: string): Promise<GroupSummary>
   createGroupTopic(userId: string, groupId: string, input: CreateGroupTopicInput): Promise<void>
   recordGroupParticipation(userId: string, groupId: string, points: number): Promise<void>
+  listWorldPulse(userId: string, filters?: { countryCode?: string | null; region?: string | null; category?: string | null; language?: Language; includeSensitive?: boolean }): Promise<WorldPulseItem[]>
+  listWorldPulseEditorItems(userId: string): Promise<WorldPulseItem[]>
+  saveWorldPulseDraft(userId: string, itemId: string | null, input: WorldPulseDraftInput): Promise<string>
+  reviewWorldPulseItem(userId: string, itemId: string, action: 'request_review' | 'approve' | 'schedule' | 'publish' | 'reject' | 'expire' | 'archive', reason?: string | null): Promise<WorldPulseItem>
+  joinFriendsLeague(userId: string): Promise<LeagueDashboard>
+  joinGroupLeague(userId: string, groupId: string): Promise<LeagueDashboard>
+  leaveLeague(userId: string, leagueType: 'friends' | 'group', groupId?: string | null): Promise<void>
+  loadLeagueDashboard(userId: string, leagueType: 'friends' | 'group', groupId?: string | null): Promise<LeagueDashboard>
+  recordLeagueActivity(userId: string, completionId: string, activityType?: 'completed_debate' | 'friend_challenge' | 'team_debate', groupId?: string | null, isMock?: boolean): Promise<void>
 }
 
 export class RepositoryError extends Error {

@@ -3,10 +3,11 @@ import { z } from 'zod'
 import { getTake, type DebateSnapshot, type Language, type ResultData, type Stance } from '../domain'
 import { defaultProfileFieldVisibility, normalizePreferences } from '../profile'
 import { challengeRecordSchema, debateSnapshotSchema, resultDataSchema, teamDebateSessionSchema } from './schemas'
-import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ProfileView, ReportInput, ReportRecord, RepositoryError } from './repository'
+import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, LeagueDashboard, ProfilePreview, ProfileView, ReportInput, ReportRecord, RepositoryError, WorldPulseDraftInput } from './repository'
 import { RepositoryError as RepositoryErrorClass } from './repository'
 import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot, VisibleProfileStats } from './types'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupMember, GroupRole, GroupSummary, GroupTopic, TeamDebateSession } from '../collaboration'
+import type { WorldPulseItem, WorldPulseSensitivity, WorldPulseSource } from '../worldPulse'
 
 type TableRow = Record<string, unknown>
 type SupabaseFailure = { code?: string; message?: string; details?: string }
@@ -38,6 +39,7 @@ const preferencesRowSchema = z.object({
   onboarding_stage: z.number().int().nullable().optional(),
   onboarding_goal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']).nullable().optional(),
   onboarding_dismissed: z.boolean().nullable().optional(),
+  hide_sensitive_world_pulse: z.boolean().nullable().optional(),
 }).passthrough()
 const visibilitySchema = z.enum(['private', 'friends', 'shared_groups', 'public'])
 const fieldVisibilitySchema = z.object({ avatar: visibilitySchema, displayName: visibilitySchema, bio: visibilitySchema, profileAccent: visibilitySchema, argumentDna: visibilitySchema, statistics: visibilitySchema, socialLinks: visibilitySchema, groupRelationship: visibilitySchema }).partial()
@@ -79,6 +81,7 @@ const preferenceFieldAliases: Record<string, string> = {
   onboarding_stage: 'onboardingStage',
   onboarding_goal: 'onboardingGoal',
   onboarding_dismissed: 'onboardingDismissed',
+  hide_sensitive_world_pulse: 'hideSensitiveWorldPulse',
 }
 
 function valueType(value: unknown): string {
@@ -166,6 +169,7 @@ export function parseSupabasePreferences(value: unknown, userId: string): UserPr
       onboardingStage: row.onboarding_stage ?? undefined,
       onboardingGoal: row.onboarding_goal ?? undefined,
       onboardingDismissed: row.onboarding_dismissed === true,
+      hideSensitiveWorldPulse: row.hide_sensitive_world_pulse === true,
     })
   } catch (caught) {
     const issuePaths = caught instanceof PreferenceShapeError ? [[caught.field]] : caught instanceof z.ZodError ? caught.issues.map(issue => issue.path) : []
@@ -190,6 +194,10 @@ export function mapSupabaseError(operation: string, error: SupabaseFailure): Rep
 
 function isCollaborationSchemaUnavailable(error: SupabaseFailure): boolean {
   return error.code === '42P01' || error.code === 'PGRST205' || /team_debate_sessions|list_my_groups|schema cache|does not exist/i.test(error.message || '')
+}
+
+function isLeagueSchemaUnavailable(error: SupabaseFailure): boolean {
+  return error.code === '42P01' || error.code === 'PGRST205' || /league_|world_pulse|schema cache|does not exist/i.test(error.message || '')
 }
 
 function validateJson<T>(schema: z.ZodType<T>, value: unknown, label: string): T {
@@ -318,6 +326,29 @@ function mapGroupInvite(value: unknown): GroupInvite {
   return parsed.data
 }
 
+function mapWorldPulseItem(value: unknown): WorldPulseItem {
+  const row = asRow(value)
+  const sources = Array.isArray(row.sources) ? row.sources.map(source => { const item = asRow(source); return { title: String(item.title || ''), publisher: String(item.publisher || ''), url: String(item.url || ''), publishedAt: typeof item.publishedAt === 'string' ? item.publishedAt : null, accessedAt: String(item.accessedAt || ''), sourceType: String(item.sourceType || 'institutional'), language: languageSchema.catch('en').parse(item.language) } as WorldPulseSource }) : []
+  const language = languageSchema.catch('en').parse(row.originalLanguage)
+  const sensitivity = z.enum(['standard', 'sensitive', 'high_sensitivity']).catch('standard').parse(row.sensitivity) as WorldPulseSensitivity
+  const headline = String(row.headline || '')
+  const debateStatement = String(row.debateStatement || '')
+  const neutralContext = String(row.neutralContext || '')
+  const sideALabel = String(row.sideALabel || 'Support the statement')
+  const sideBLabel = String(row.sideBLabel || 'Question the statement')
+  return { id: String(row.id || ''), slug: String(row.slug || ''), status: z.enum(['draft', 'review', 'scheduled', 'published', 'expired', 'rejected', 'archived']).catch('draft').parse(row.status), headline, debateStatement, neutralContext, sideALabel, sideBLabel, category: String(row.category || 'World Pulse'), countryCode: typeof row.countryCode === 'string' ? row.countryCode : null, region: typeof row.region === 'string' ? row.region : null, languages: Array.isArray(row.languages) ? row.languages.filter((item): item is Language => languageSchema.safeParse(item).success) : [language], originalLanguage: language, eventDate: typeof row.eventDate === 'string' ? row.eventDate : null, publishAt: typeof row.publishAt === 'string' ? row.publishAt : null, expiresAt: typeof row.expiresAt === 'string' ? row.expiresAt : null, lastReviewedAt: String(row.lastReviewedAt || ''), sensitivity, sourceCount: Number(row.sourceCount || sources.length), sources, translations: { [language]: { headline, debateStatement, neutralContext, sideALabel, sideBLabel } }, snapshot: { id: String(row.id || ''), slug: String(row.slug || ''), headline, debateStatement, neutralContext, sideALabel, sideBLabel, category: String(row.category || 'World Pulse'), countryCode: typeof row.countryCode === 'string' ? row.countryCode : null, region: typeof row.region === 'string' ? row.region : null, eventDate: typeof row.eventDate === 'string' ? row.eventDate : null, lastReviewedAt: String(row.lastReviewedAt || ''), sensitivity, sources: sources.map(source => ({ title: source.title, publisher: source.publisher, url: source.url })) }, createdAt: String(row.createdAt || ''), updatedAt: String(row.updatedAt || ''), createdBy: null, reviewedBy: null }
+}
+
+function mapLeagueDashboard(value: unknown): LeagueDashboard {
+  const row = asRow(value)
+  const seasonRow = asRow(row.season)
+  const participants = Array.isArray(row.participants) ? row.participants.map(item => { const value = asRow(item); return { userId: String(value.userId || ''), displayName: String(value.displayName || 'Member'), points: Number(value.points || 0), awardCount: Number(value.awardCount || 0) } }) : []
+  const myEvents = Array.isArray(row.myEvents) ? row.myEvents.map(item => { const value = asRow(item); return { id: String(value.id || ''), reason: String(value.reason || ''), points: Number(value.points || 0), occurredAt: String(value.occurredAt || ''), category: String(value.category || '') } }) : []
+  const awards = Array.isArray(row.awards) ? row.awards.map(item => { const value = asRow(item); return { userId: String(value.userId || ''), award: String(value.award || '') } }) : []
+  const pastSeasons = Array.isArray(row.pastSeasons) ? row.pastSeasons.map(item => { const value = asRow(item); return { id: String(value.id || ''), startAt: String(value.startAt || ''), endAt: String(value.endAt || ''), status: String(value.status || ''), scoringVersion: String(value.scoringVersion || '') } }) : []
+  return { available: row.available !== false, joined: row.joined === true, season: row.season && row.season !== null ? { id: String(seasonRow.id || ''), startAt: String(seasonRow.startAt || ''), endAt: String(seasonRow.endAt || ''), status: String(seasonRow.status || ''), scoringVersion: String(seasonRow.scoringVersion || ''), participantCount: Number(seasonRow.participantCount || 0) } : null, participants, myEvents, awards, pastSeasons }
+}
+
 export function createSupabaseRepository(client: SupabaseClient): AppRepository {
   const backend: BackendName = 'supabase'
   const diagnostics: RepositoryDiagnostics = { backend, ready: true, message: 'Using authenticated Supabase persistence.' }
@@ -342,7 +373,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
   }
 
   async function savePreferences(preferences: UserPreferences): Promise<void> {
-    const { error } = await client.from('user_preferences').upsert({ user_id: preferences.userId, topic_preferences: preferences.topicPreferences, debate_languages: preferences.debateLanguages, intensity: preferences.intensity, preferred_mode: preferences.preferredMode, preferred_ai_style: preferences.preferredAiStyle, preferred_opponent_type: preferences.preferredOpponentType, preferred_ai_family: preferences.preferredAiFamily, preferred_opponent_id: preferences.preferredOpponentId, preferred_ai_model_id: preferences.preferredAiModelId, ai_difficulty: preferences.aiDifficulty, ai_round_length: preferences.aiRoundLength, ai_quality: preferences.aiQuality, ai_response_length: preferences.aiResponseLength, show_model_details: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reduced_motion: preferences.reducedMotion, text_size: preferences.textSize, share_real_stance: preferences.shareRealStance, onboarding_completed: preferences.onboardingCompleted, onboarding_stage: preferences.onboardingStage, onboarding_goal: preferences.onboardingGoal, onboarding_dismissed: preferences.onboardingDismissed }, { onConflict: 'user_id' })
+    const { error } = await client.from('user_preferences').upsert({ user_id: preferences.userId, topic_preferences: preferences.topicPreferences, debate_languages: preferences.debateLanguages, intensity: preferences.intensity, preferred_mode: preferences.preferredMode, preferred_ai_style: preferences.preferredAiStyle, preferred_opponent_type: preferences.preferredOpponentType, preferred_ai_family: preferences.preferredAiFamily, preferred_opponent_id: preferences.preferredOpponentId, preferred_ai_model_id: preferences.preferredAiModelId, ai_difficulty: preferences.aiDifficulty, ai_round_length: preferences.aiRoundLength, ai_quality: preferences.aiQuality, ai_response_length: preferences.aiResponseLength, show_model_details: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reduced_motion: preferences.reducedMotion, text_size: preferences.textSize, share_real_stance: preferences.shareRealStance, onboarding_completed: preferences.onboardingCompleted, onboarding_stage: preferences.onboardingStage, onboarding_goal: preferences.onboardingGoal, onboarding_dismissed: preferences.onboardingDismissed, hide_sensitive_world_pulse: preferences.hideSensitiveWorldPulse }, { onConflict: 'user_id' })
     if (error) throw mapSupabaseError('saving your preferences', error)
   }
 
@@ -458,6 +489,7 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
   async function completeFriendChallenge(_userId: string, challengeId: string, response: string): Promise<FriendChallengeRecord> {
     const { data, error } = await client.rpc('complete_friend_challenge', { p_challenge_id: challengeId, p_response_content: response })
     if (error) throw mapSupabaseError('answering the friend challenge', error)
+    await recordLeagueActivity(_userId, challengeId, 'friend_challenge')
     return mapFriendChallenge({ ...asRow(data), direction: 'incoming', creator: null, recipient: null, expiresAt: new Date().toISOString(), response, result: asRow(data).result || null })
   }
 
@@ -578,6 +610,8 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (!result.debateId) throw new RepositoryErrorClass('validation', 'A completed result must reference its debate.')
     const { error } = await client.from('debate_results').upsert({ id: result.id, debate_id: result.debateId, owner_id: userId, scores: result.scores, argument_dna: result, coaching: result.coaching, model_provider: 'server-ai-or-mock' }, { onConflict: 'debate_id' })
     if (error) throw mapSupabaseError('saving your result', error)
+    const league = await client.rpc('record_league_activity', { p_completion_id: result.debateId, p_activity_type: 'completed_debate', p_group_id: null, p_is_mock: Boolean(result.ai && !result.ai.evaluationAvailable) })
+    if (league.error && !isLeagueSchemaUnavailable(league.error)) throw mapSupabaseError('recording your private league activity', league.error)
   }
 
   async function loadHistory(userId: string): Promise<ResultData[]> {
@@ -758,5 +792,75 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (error) throw mapSupabaseError('recording group participation', error)
   }
 
-  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, getProfileForViewer, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation }
+  async function listWorldPulse(userId: string, filters: { countryCode?: string | null; region?: string | null; category?: string | null; language?: Language; includeSensitive?: boolean } = {}) {
+    if (!userId) return []
+    const { data, error } = await client.rpc('list_world_pulse_items', { p_country_code: filters.countryCode || null, p_region: filters.region || null, p_category: filters.category || null, p_language: filters.language || 'en', p_include_sensitive: filters.includeSensitive !== false, p_limit: 24, p_offset: 0 })
+    if (error && isLeagueSchemaUnavailable(error)) return []
+    if (error) throw mapSupabaseError('loading World Pulse', error)
+    if (!Array.isArray(data)) throw new RepositoryErrorClass('validation', 'Supabase returned invalid World Pulse data.')
+    return data.map(mapWorldPulseItem)
+  }
+
+  async function listWorldPulseEditorItems(userId: string) {
+    if (!userId) return []
+    const { data, error } = await client.rpc('get_world_pulse_editor_items')
+    if (error) throw mapSupabaseError('loading World Pulse editorial items', error)
+    if (!Array.isArray(data)) throw new RepositoryErrorClass('validation', 'Supabase returned invalid editorial data.')
+    return data.map(mapWorldPulseItem)
+  }
+
+  async function saveWorldPulseDraft(userId: string, itemId: string | null, input: WorldPulseDraftInput) {
+    if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required for editorial actions.')
+    const { data, error } = await client.rpc('save_world_pulse_draft', {
+      p_item_id: itemId,
+      p_payload: { ...input, debateStatement: input.debateStatement, neutralContext: input.neutralContext, sideALabel: input.sideALabel, sideBLabel: input.sideBLabel, countryCode: input.countryCode, originalLanguage: input.originalLanguage, eventDate: input.eventDate, publishAt: input.publishAt, expiresAt: input.expiresAt, lastReviewedAt: input.lastReviewedAt },
+      p_sources: input.sources.map(source => ({ title: source.title, publisher: source.publisher, url: source.url, published_at: source.publishedAt, accessed_at: source.accessedAt, source_type: source.sourceType, language: source.language })),
+      p_translations: input.translations.map(translation => ({ language: translation.language, headline: translation.headline, debate_statement: translation.debateStatement, neutral_context: translation.neutralContext, side_a_label: translation.sideALabel, side_b_label: translation.sideBLabel, is_reviewed: translation.isReviewed })),
+    })
+    if (error) throw mapSupabaseError('saving World Pulse draft', error)
+    return String(data)
+  }
+
+  async function reviewWorldPulseItem(userId: string, itemId: string, action: 'request_review' | 'approve' | 'schedule' | 'publish' | 'reject' | 'expire' | 'archive', reason: string | null = null) {
+    if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required for editorial actions.')
+    const { data, error } = await client.rpc('review_world_pulse_item', { p_item_id: itemId, p_action: action, p_reason: reason, p_scheduled_at: null })
+    if (error) throw mapSupabaseError('updating World Pulse editorial state', error)
+    return mapWorldPulseItem(data)
+  }
+
+  async function loadLeagueDashboard(userId: string, leagueType: 'friends' | 'group', groupId: string | null = null) {
+    if (!userId) return mapLeagueDashboard(null)
+    const { data, error } = await client.rpc('load_league_dashboard', { p_league_type: leagueType, p_group_id: groupId })
+    if (error && isLeagueSchemaUnavailable(error)) return mapLeagueDashboard(null)
+    if (error) throw mapSupabaseError('loading your private league', error)
+    return mapLeagueDashboard(data)
+  }
+
+  async function joinFriendsLeague(userId: string) {
+    if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to join the Friends League.')
+    const { data, error } = await client.rpc('join_friends_league')
+    if (error) throw mapSupabaseError('joining the Friends League', error)
+    return mapLeagueDashboard(data)
+  }
+
+  async function joinGroupLeague(userId: string, groupId: string) {
+    if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to join the Group League.')
+    const { data, error } = await client.rpc('join_group_league', { p_group_id: groupId })
+    if (error) throw mapSupabaseError('joining the Group League', error)
+    return mapLeagueDashboard(data)
+  }
+
+  async function leaveLeague(userId: string, leagueType: 'friends' | 'group', groupId: string | null = null) {
+    if (!userId) throw new RepositoryErrorClass('auth_required', 'Authentication is required to leave the league.')
+    const { error } = await client.rpc('leave_current_league', { p_league_type: leagueType, p_group_id: groupId })
+    if (error) throw mapSupabaseError('leaving the private league', error)
+  }
+
+  async function recordLeagueActivity(userId: string, completionId: string, activityType: 'completed_debate' | 'friend_challenge' | 'team_debate' = 'completed_debate', groupId: string | null = null, isMock = false) {
+    if (!userId) return
+    const { error } = await client.rpc('record_league_activity', { p_completion_id: completionId, p_activity_type: activityType, p_group_id: groupId, p_is_mock: isMock })
+    if (error && !isLeagueSchemaUnavailable(error)) throw mapSupabaseError('recording private league activity', error)
+  }
+
+  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, getProfileForViewer, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation, listWorldPulse, listWorldPulseEditorItems, saveWorldPulseDraft, reviewWorldPulseItem, joinFriendsLeague, joinGroupLeague, leaveLeague, loadLeagueDashboard, recordLeagueActivity }
 }

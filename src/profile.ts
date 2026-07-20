@@ -62,6 +62,7 @@ export const userPreferencesSchema = z.object({
   onboardingStage: z.number().int().min(0).max(3),
   onboardingGoal: z.enum(['reasoning', 'school', 'friends', 'perspectives', 'fun']),
   onboardingDismissed: z.boolean(),
+  hideSensitiveWorldPulse: z.boolean(),
 })
 
 export function normalizeProfile(profile: Partial<UserProfile> & Pick<UserProfile, 'id'>): UserProfile {
@@ -113,6 +114,7 @@ export function normalizePreferences(preferences: Partial<UserPreferences> & Pic
     onboardingStage: Math.max(0, Math.min(3, Number(preferences.onboardingStage) || 0)),
     onboardingGoal: preferences.onboardingGoal || 'reasoning',
     onboardingDismissed: preferences.onboardingDismissed === true,
+    hideSensitiveWorldPulse: preferences.hideSensitiveWorldPulse === true,
   })
 }
 

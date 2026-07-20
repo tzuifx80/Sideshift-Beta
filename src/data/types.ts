@@ -60,6 +60,7 @@ export type UserPreferences = {
   onboardingStage: number
   onboardingGoal: 'reasoning' | 'school' | 'friends' | 'perspectives' | 'fun'
   onboardingDismissed: boolean
+  hideSensitiveWorldPulse: boolean
 }
 
 export type UserStatsSnapshot = {

@@ -1,10 +1,13 @@
 import { clearState, loadState, saveState, type PersistedState } from '../storage'
-import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput } from './repository'
+import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput, WorldPulseDraftInput } from './repository'
 import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot } from './types'
 import { makeUuid } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupRole, GroupSummary } from '../collaboration'
 import type { LocalGroup } from '../storage'
 import { defaultProfileFieldVisibility } from '../profile'
+import { isWorldPulseVisible, worldPulseSeed, type WorldPulseItem } from '../worldPulse'
+import type { Language } from '../domain'
+import type { LeagueDashboard } from './repository'
 
 function cloneState(): PersistedState {
   return loadState()
@@ -17,6 +20,8 @@ function groupRole(group: LocalGroup, userId: string): GroupRole {
 function groupSummary(group: LocalGroup, userId: string): GroupSummary {
   return { id: group.id, name: group.name, description: group.description, icon: group.icon, accent: group.accent, language: group.language, role: groupRole(group, userId), memberCount: group.members.length, leaderboardEnabled: group.leaderboardEnabled, updatedAt: group.updatedAt }
 }
+
+const emptyLeagueDashboard = (): LeagueDashboard => ({ available: false, joined: false, season: null, participants: [], myEvents: [], awards: [], pastSeasons: [] })
 
 export function createLocalRepository(): AppRepository {
   const backend: BackendName = 'local'
@@ -36,11 +41,11 @@ export function createLocalRepository(): AppRepository {
     async loadPreferences(userId) {
       const state = cloneState()
       if (state.userId !== userId) return null
-      return { userId, topicPreferences: state.interests, debateLanguages: [state.debateLanguage], intensity: state.intensity, preferredMode: state.preferredMode, preferredAiStyle: state.preferredAiStyle, preferredOpponentType: state.preferredOpponentType, preferredAiFamily: state.preferredAiFamily, preferredOpponentId: state.preferredOpponentId, preferredAiModelId: state.preferredAiModelId, aiDifficulty: state.aiDifficulty, aiRoundLength: state.aiRoundLength, aiQuality: state.aiQuality, aiResponseLength: state.aiResponseLength, showModelDetails: state.showModelDetails, theme: state.theme, accent: state.accent, reducedMotion: state.reducedMotion, textSize: state.textSize, shareRealStance: state.shareRealStance, onboardingCompleted: state.onboarded, onboardingStage: state.onboarded ? 3 : 0, onboardingGoal: 'reasoning', onboardingDismissed: false }
+      return { userId, topicPreferences: state.interests, debateLanguages: [state.debateLanguage], intensity: state.intensity, preferredMode: state.preferredMode, preferredAiStyle: state.preferredAiStyle, preferredOpponentType: state.preferredOpponentType, preferredAiFamily: state.preferredAiFamily, preferredOpponentId: state.preferredOpponentId, preferredAiModelId: state.preferredAiModelId, aiDifficulty: state.aiDifficulty, aiRoundLength: state.aiRoundLength, aiQuality: state.aiQuality, aiResponseLength: state.aiResponseLength, showModelDetails: state.showModelDetails, theme: state.theme, accent: state.accent, reducedMotion: state.reducedMotion, textSize: state.textSize, shareRealStance: state.shareRealStance, onboardingCompleted: state.onboarded, onboardingStage: state.onboarded ? 3 : 0, onboardingGoal: 'reasoning', onboardingDismissed: false, hideSensitiveWorldPulse: state.hideSensitiveWorldPulse }
     },
     async savePreferences(preferences) {
       const state = cloneState()
-      saveState({ ...state, userId: preferences.userId, interests: preferences.topicPreferences, onboarded: preferences.onboardingCompleted, debateLanguage: preferences.debateLanguages[0] || state.debateLanguage, intensity: preferences.intensity || state.intensity, preferredMode: preferences.preferredMode, preferredAiStyle: preferences.preferredAiStyle || state.preferredAiStyle, preferredOpponentType: preferences.preferredOpponentType, preferredAiFamily: preferences.preferredAiFamily, preferredOpponentId: preferences.preferredOpponentId, preferredAiModelId: preferences.preferredAiModelId, aiDifficulty: preferences.aiDifficulty, aiRoundLength: preferences.aiRoundLength, aiQuality: preferences.aiQuality, aiResponseLength: preferences.aiResponseLength, showModelDetails: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reducedMotion: preferences.reducedMotion, textSize: preferences.textSize, shareRealStance: preferences.shareRealStance })
+      saveState({ ...state, userId: preferences.userId, interests: preferences.topicPreferences, onboarded: preferences.onboardingCompleted, debateLanguage: preferences.debateLanguages[0] || state.debateLanguage, intensity: preferences.intensity || state.intensity, preferredMode: preferences.preferredMode, preferredAiStyle: preferences.preferredAiStyle || state.preferredAiStyle, preferredOpponentType: preferences.preferredOpponentType, preferredAiFamily: preferences.preferredAiFamily, preferredOpponentId: preferences.preferredOpponentId, preferredAiModelId: preferences.preferredAiModelId, aiDifficulty: preferences.aiDifficulty, aiRoundLength: preferences.aiRoundLength, aiQuality: preferences.aiQuality, aiResponseLength: preferences.aiResponseLength, showModelDetails: preferences.showModelDetails, theme: preferences.theme, accent: preferences.accent, reducedMotion: preferences.reducedMotion, textSize: preferences.textSize, shareRealStance: preferences.shareRealStance, hideSensitiveWorldPulse: preferences.hideSensitiveWorldPulse })
     },
     async getPrivateProfile() { throw new Error('Friends are available only with authenticated Supabase persistence.') },
     async getProfileForViewer() { return { state: 'unavailable', relationship: 'outsider', profile: null, socialLinks: [], statistics: {}, isOwner: false } },
@@ -258,5 +263,17 @@ export function createLocalRepository(): AppRepository {
       group.updatedAt = new Date().toISOString()
       saveState(state)
     },
+    async listWorldPulse(_userId: string, filters?: { countryCode?: string | null; region?: string | null; category?: string | null; language?: Language; includeSensitive?: boolean }): Promise<WorldPulseItem[]> {
+      const now = new Date()
+      return worldPulseSeed.filter(item => isWorldPulseVisible(item, now) && (filters?.includeSensitive !== false || item.sensitivity === 'standard') && (!filters?.countryCode || item.countryCode === filters.countryCode || item.region === 'World') && (!filters?.region || item.region === filters.region || item.region === 'World') && (!filters?.category || item.category === filters.category))
+    },
+    async listWorldPulseEditorItems() { return [] },
+    async saveWorldPulseDraft(_userId: string, _itemId: string | null, _input: WorldPulseDraftInput) { throw new Error('Editorial tools are available only with authenticated Supabase persistence.') },
+    async reviewWorldPulseItem() { throw new Error('Editorial tools are available only with authenticated Supabase persistence.') },
+    async joinFriendsLeague() { return emptyLeagueDashboard() },
+    async joinGroupLeague() { return emptyLeagueDashboard() },
+    async leaveLeague() {},
+    async loadLeagueDashboard() { return emptyLeagueDashboard() },
+    async recordLeagueActivity() {},
   }
 }

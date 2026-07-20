@@ -1,5 +1,12 @@
 # Codex Checkpoint
 
+## World Pulse and Private Debate League checkpoint — 2026-07-20
+
+- Local and remote migrations match through `0032`; migrations `0001`–`0027` remain immutable and the phase began with `0028`.
+- World Pulse is a reviewed, source-linked, time-bounded collection with translation fallback, sensitivity filtering, editor RPCs, and historical debate snapshots.
+- Friends and Group Leagues are private, opt-in, server-scored, idempotent, capped, and season-versioned; expired seasons finalize on authenticated League access.
+- Targeted domain tests, typecheck, lint, and the linked World Pulse/League verifier pass. Android debug/build and full-device interaction remain separate checks.
+
 ## Profile & Settings 2.0 checkpoint — 2026-07-20
 
 - Profile/settings is split into a mobile hub with Profile, Privacy and safety, Debate preferences, Appearance/accessibility, Account/data, and Help/app sections.

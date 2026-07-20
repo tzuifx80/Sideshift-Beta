@@ -1,5 +1,9 @@
 # Known limitations
 
+- World Pulse editorial creation/editing is intentionally a minimal internal workspace; source and translation form editing is available through the server RPC boundary but not yet exposed as a full newsroom form.
+- The initial World Pulse content is deterministic demonstration material, not a live-news feed. No automatic breaking-news ingestion or AI publication is enabled.
+- Group League and completed-season award behavior are covered by schema/RPC compilation and domain tests; full multi-user remote Group privacy and season-expiry exercise remains a manual follow-up because anonymous-auth rate limits limit additional stable test-user creation.
+
 - `npx supabase db lint --linked --fail-on error` still reports the pre-existing `pg_catalog.trim(text)` error in `complete_challenge_response` and an unused `p_points` warning; this repair did not alter those unrelated functions.
 
 - `adb` is not installed in this workspace, so the debug APK could not be installed or exercised on an emulator/device.

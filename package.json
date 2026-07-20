@@ -21,6 +21,7 @@
     "test:supabase": "node --env-file=.env scripts/test-supabase-integration.mjs",
     "test:supabase:private-social": "node --env-file=.env scripts/test-private-social-supabase.mjs",
     "test:supabase:collaboration": "node --env-file=.env scripts/test-collaboration-supabase.mjs",
+    "test:supabase:world-pulse-league": "node --env-file=.env scripts/test-world-pulse-league-supabase.mjs",
     "test:rls": "node --env-file=.env scripts/test-supabase-integration.mjs",
     "test:playwright": "python critical_flow_test.py",
     "test:playwright:explore": "python scripts/explore_ai_flow.py",

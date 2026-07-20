@@ -732,3 +732,58 @@ html.reduced-motion *, html.reduced-motion *::before, html.reduced-motion *::aft
   .settings-footer .button { width: 100%; }
   .category-shortcuts { align-items: flex-start; }
 }
+
+.world-pulse-section { margin-top: 28px; }
+.home-pulse-retention { max-width: 1120px; margin: 0 auto 24px; display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+.home-pulse-retention h2, .home-pulse-retention p { margin: 6px 0 0; }
+.home-pulse-retention p, .home-pulse-retention small { color: var(--muted); }
+.world-pulse-filters { align-items: center; margin: 16px 0; }
+.compact-select { min-width: 150px; width: auto; }
+.inline-toggle { display: inline-flex; width: auto; margin: 0; padding: 8px 12px; }
+.world-pulse-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.world-pulse-card { display: flex; flex-direction: column; gap: 12px; }
+.world-pulse-card h3 { margin: 0; font-size: clamp(1.2rem, 2vw, 1.55rem); line-height: 1.08; }
+.world-pulse-card p { margin: 0; color: var(--muted); }
+.world-pulse-why strong { color: var(--ink); }
+.world-pulse-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: .78rem; }
+.world-pulse-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: auto; }
+.world-pulse-sources { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.world-pulse-sources a { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: .88rem; text-decoration: none; }
+.world-pulse-sources a:hover { text-decoration: underline; }
+.debate-context-panel { max-width: 760px; margin: 18px auto 0; }
+.debate-context-panel h2 { margin: 0; }
+.league-panel { max-width: 760px; margin: 24px auto; }
+.league-season-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0; padding: 12px 0; border-block: 1px solid var(--line); color: var(--muted); font-size: .88rem; }
+.league-standings, .league-breakdown, .league-awards { margin-top: 20px; }
+.league-event-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.league-event-row small { grid-column: 1 / -1; color: var(--muted); }
+.league-awards { display: flex; flex-wrap: wrap; gap: 8px; }
+.group-league-page, .friends-league-page { padding-top: 0; }
+.admin-item-list { display: grid; gap: 12px; }
+.admin-item { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.admin-item.selected { border-color: var(--coral); }
+.admin-item-select { flex: 1; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.admin-item h2 { margin: 8px 0 4px; }
+.admin-item p { margin: 0; color: var(--muted); }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 18px; align-items: start; }
+.world-pulse-editor { display: grid; gap: 12px; position: sticky; top: 18px; }
+.world-pulse-editor label { display: grid; gap: 6px; font-size: .82rem; font-weight: 700; }
+.world-pulse-editor input, .world-pulse-editor textarea, .world-pulse-editor select { width: 100%; }
+.world-pulse-editor textarea { min-height: 82px; resize: vertical; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-source-editor { display: grid; gap: 10px; }
+.admin-source-row { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap: 8px; }
+.admin-preview { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 70%, transparent); }
+.admin-preview h3, .admin-preview p { margin: 0; }
+
+@media (max-width: 700px) {
+  .world-pulse-grid { grid-template-columns: 1fr; }
+  .home-pulse-retention { align-items: stretch; flex-direction: column; }
+  .admin-item { align-items: stretch; flex-direction: column; }
+  .admin-layout { grid-template-columns: 1fr; }
+  .world-pulse-editor { position: static; }
+  .admin-source-row, .admin-form-grid { grid-template-columns: 1fr; }
+  .world-pulse-filters { align-items: stretch; }
+  .compact-select { width: 100%; }
+}

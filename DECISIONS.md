@@ -1,5 +1,16 @@
 # Decisions
 
+## 2026-07-20 World Pulse and Private Debate League
+
+- World Pulse is curated and server-published: normal users read only active published payloads, while draft/review/publish actions use editor roles and security-definer RPCs.
+- World Pulse sources store metadata and HTTPS links, not article bodies. Published cards include source count, publication/review dates, region, and a translation fallback indicator.
+- World Pulse content is copied into a bounded debate snapshot so later expiration or source edits cannot rewrite completed debate history.
+- Friends League is opt-in; Group League is private and membership-gated. Standings expose aggregate participant totals, while detailed score events are returned only for the authenticated participant.
+- League events are inserted only by a security-definer RPC from completed debate, friend-challenge, or Team Debate identifiers. Completion/reason uniqueness, daily caps, mock exclusion, and scoring versions are database-enforced.
+- Expired seasons finalize on the next authenticated League request, freeze their status, and calculate only evidence-backed awards. No scheduler or public leaderboard was introduced.
+- Friends standings are filtered to accepted friendship pairs, and Group dashboards return unavailable before membership is established.
+- New work begins at migration `0028`; applied migrations `0001`–`0027` remain immutable.
+
 ## 2026-07-20 Profile & Settings 2.0
 
 - Profile viewing uses the server-authoritative `get_profile_for_viewer` boundary. Hidden fields, statistics, and social URLs are omitted from the response.

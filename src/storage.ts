@@ -35,6 +35,7 @@ export type PersistedState = {
   accent: AccentTheme
   reducedMotion: boolean
   textSize: TextSize
+  hideSensitiveWorldPulse: boolean
   debate: DebateSnapshot | null
   result: ResultData | null
   history: ResultData[]
@@ -107,6 +108,7 @@ const defaultState = (): PersistedState => ({
   accent: 'coral',
   reducedMotion: false,
   textSize: 'comfortable',
+  hideSensitiveWorldPulse: false,
   debate: null,
   result: null,
   history: [],
@@ -162,6 +164,7 @@ export function loadState(): PersistedState {
       accent: ['violet', 'cyan', 'amber', 'coral', 'mint', 'neutral'].includes(parsed.accent as string) ? parsed.accent as AccentTheme : fallback.accent,
       reducedMotion: parsed.reducedMotion === true,
       textSize: parsed.textSize === 'compact' ? 'compact' : 'comfortable',
+      hideSensitiveWorldPulse: parsed.hideSensitiveWorldPulse === true,
       history: Array.isArray(parsed.history) ? parsed.history : [],
       language: ['en', 'de', 'fr', 'es', 'it'].includes(parsed.language as string) ? parsed.language as Language : 'en',
       debate: parsed.debate ?? null,

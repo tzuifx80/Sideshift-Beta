@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { localizeTake } from './i18n'
+import type { WorldPulseSnapshot } from './worldPulse'
 
 export type Mode = 'classic' | 'sideswitch' | 'blindside' | 'commonground'
 export type Stance = -2 | -1 | 0 | 1 | 2
@@ -60,6 +61,7 @@ export type Take = {
   color: string
   supportLabel: string
   opposeLabel: string
+  worldPulse?: WorldPulseSnapshot
 }
 
 export type TranscriptTurn = {
@@ -118,6 +120,7 @@ export type DebateSnapshot = {
   language: Language
   status: 'active' | 'completed'
   updatedAt: string
+  worldPulse?: WorldPulseSnapshot
   ai?: AiDebateData
 }
 

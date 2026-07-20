@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added World Pulse with reviewed statuses, HTTPS source metadata, translations, sensitivity preferences, freshness windows, debate snapshots, Explore integration, and a server-authorized internal review boundary.
+- Added private opt-in Friends and Group Debate Leagues with recurring UTC seasons, server-authoritative idempotent scoring, anti-farming caps, private breakdowns, evidence-backed awards, and request-time season finalization.
+- Added migrations `0028`–`0032`; migrations `0001`–`0027` remain untouched. Added focused domain tests and the linked World Pulse/League verifier.
+
 - Repaired private avatar Storage RLS across migrations `0025`–`0027`: owner create/replace/remove is canonical-path-only, friend reads remain privacy-gated, and outsider direct access remains denied.
 - Added `android:build:verify` for a process-only HTTPS placeholder build while preserving local LAN development configuration and production URL rejection.
 

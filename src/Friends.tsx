@@ -8,6 +8,7 @@ import { useTranslations } from './i18n'
 import { getTake, takes } from './domain'
 import { ProfileViewScreen } from './ProfileView'
 import { humanProfileKey } from './profileNavigation'
+import { LeaguePanel } from './features/league/LeaguePanel'
 
 function displayName(profile: ProfilePreview | null) { return profile?.displayName || (profile?.handle ? `@${profile.handle}` : '') }
 const ProfileNavigationContext = createContext<((profileKey: string) => void) | undefined>(undefined)
@@ -26,7 +27,7 @@ function ProfilePreviewCard({ repository, userId, profile, fallback, children, o
 
 type FriendsProps = { userId: string; language: Language; repository: AppRepository; profile: UserProfile; onProfile: (profile: UserProfile, forceAvatarRevision?: boolean) => void; onOpenProfile?: (profileKey: string) => void; online: boolean; onNotify: (message: string) => void }
 
-export function Friends({ userId, language, repository, profile, onProfile, onOpenProfile, online, onNotify }: FriendsProps) {
+function FriendsBase({ userId, language, repository, profile, onProfile, onOpenProfile, online, onNotify }: FriendsProps) {
   const t = useTranslations(language)
   const [friendships, setFriendships] = useState<FriendshipRecord[]>([])
   const [blocks, setBlocks] = useState<ProfilePreview[]>([])
@@ -88,4 +89,8 @@ export function Friends({ userId, language, repository, profile, onProfile, onOp
     {groupTarget && <div className="modal-scrim"><section className="modal-card card-surface"><button className="modal-close" type="button" onClick={() => setGroupTarget(null)} aria-label={t('common.close')}><Icon name="close" size={18} /></button><span className="eyebrow">{t('friends.inviteToGroup')}</span><h2>{displayName(groupTarget)}</h2><select className="settings-select" value={groupId} onChange={event => setGroupId(event.target.value)}><option value="">{t('friends.chooseGroup')}</option>{memberGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select><Button onClick={() => void run(async () => { await repository.createGroupFriendInvitation(userId, groupId, groupTarget.profileKey); setGroupTarget(null); setGroupId('') })} disabled={!groupId}>{t('friends.inviteToGroup')}</Button></section></div>}
     {error && <p className="form-error" role="alert">{error}</p>}{!online && <p className="muted">{t('common.offline')}</p>}
   </div></ProfileNavigationContext.Provider>
+}
+
+export function Friends(props: FriendsProps) {
+  return <><FriendsBase {...props} />{props.repository.backend === 'supabase' && <div className="page friends-league-page"><LeaguePanel userId={props.userId} language={props.language} repository={props.repository} leagueType="friends" /></div>}</>
 }
