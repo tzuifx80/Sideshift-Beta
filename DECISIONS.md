@@ -7,6 +7,12 @@
 - Social links are limited to five HTTPS URLs with known-provider host checks and no ownership claim. External navigation uses `noopener noreferrer`.
 - Supabase currently provisions anonymous sessions only in this beta. Settings identifies that state and requires a strong confirmation before anonymous sign-out; email/OAuth upgrade is not falsely advertised.
 
+## 2026-07-20 Android logout and avatar repair
+
+- Logout sets an explicit signed-out state after `auth.signOut({ scope: 'local' })`; it does not call the anonymous-session bootstrap again. Auth-state callbacks are ignored during the sign-out transaction so a late `SIGNED_OUT` event cannot undo the route reset.
+- Friends is display-only for avatars. The owner editor remains in Profile Settings, and successful upload/removal waits for storage, profile persistence, a fresh signed URL, and the shared profile-state update.
+- Avatar processing falls back from `createImageBitmap(File)` to an object-URL `Image` decode for Android WebView picker blobs. No storage policy or applied migration changed.
+
 ## 2026-07-20 Android beta completion
 
 - Basic request identity is derived from `debateId` and round, sanitized to the server's accepted request-header alphabet, and reused for safe retries.

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { clearPrivateClientState } from './logout'
+import { describe, expect, it, vi } from 'vitest'
+import { acceptsAnonymousLogoutConfirmation, clearPrivateClientState, signOutAndClear } from './logout'
 
 function storageFixture(values: Record<string, string>): Storage {
   const map = new Map(Object.entries(values))
@@ -15,6 +15,12 @@ function storageFixture(values: Record<string, string>): Storage {
 }
 
 describe('private logout cleanup', () => {
+  it('requires the exact anonymous destructive confirmation', () => {
+    expect(acceptsAnonymousLogoutConfirmation('SIGN OUT', 'SIGN OUT')).toBe(true)
+    expect(acceptsAnonymousLogoutConfirmation(' sign out ', 'SIGN OUT')).toBe(false)
+    expect(acceptsAnonymousLogoutConfirmation(null, 'SIGN OUT')).toBe(false)
+  })
+
   it('clears private state and drafts while retaining language and appearance preferences', () => {
     const storage = storageFixture({
       'sideshift-state-v2': '{}',
@@ -29,5 +35,23 @@ describe('private logout cleanup', () => {
     clearPrivateClientState(storage)
 
     expect(Array.from(storage.values.keys()).sort()).toEqual(['sideshift-install-dismissed-v1', 'sideshift-locale-v1'])
+  })
+
+  it('signs out locally before clearing private state', async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: null })
+    const clearState = vi.fn()
+
+    await signOutAndClear({ auth: { signOut } }, clearState)
+
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(clearState).toHaveBeenCalledOnce()
+  })
+
+  it('preserves local state when Supabase sign-out fails', async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: new Error('network') })
+    const clearState = vi.fn()
+
+    await expect(signOutAndClear({ auth: { signOut } }, clearState)).rejects.toThrow('network')
+    expect(clearState).not.toHaveBeenCalled()
   })
 })

@@ -1,11 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js'
 import { loadState } from '../storage'
 import { selectRepository } from '../data/selectRepository'
 import { createSupabaseBrowserClient, getOrCreateAnonymousSession, readSupabaseConfig } from '../data/supabaseClient'
 import type { AppRepository } from '../data/repository'
 import { defaultProfileFieldVisibility } from '../profile'
-import { clearPrivateClientState } from '../logout'
+import { logoutDiagnostic, signOutAndClear } from '../logout'
 
 export type AuthState = {
   user: User | null
@@ -15,29 +15,31 @@ export type AuthState = {
   error: string | null
   backend: 'local' | 'supabase'
   repository: AppRepository | null
+  signedOut: boolean
   retry: () => void
   resetSession: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthState>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend: 'local', repository: null, retry: () => undefined, resetSession: async () => undefined })
+const AuthContext = createContext<AuthState>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend: 'local', repository: null, signedOut: false, retry: () => undefined, resetSession: async () => undefined })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const backend = (import.meta.env.VITE_DATA_BACKEND || (import.meta.env.PROD ? 'supabase' : 'local')) as AuthState['backend']
-  const [state, setState] = useState<Omit<AuthState, 'retry' | 'resetSession'>>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend, repository: null })
+  const [state, setState] = useState<Omit<AuthState, 'retry' | 'resetSession'>>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend, repository: null, signedOut: false })
   const [attempt, setAttempt] = useState(0)
+  const signingOutRef = useRef(false)
 
   const connect = useCallback(async (signal?: { cancelled: boolean }): Promise<() => void> => {
     if (backend === 'local') {
       const local = loadState()
       const repository = selectRepository({ VITE_DATA_BACKEND: 'local' })
-      setState({ user: null, userId: local.userId, accessToken: null, loading: false, error: null, backend, repository })
+      setState({ user: null, userId: local.userId, accessToken: null, loading: false, error: null, backend, repository, signedOut: false })
       return () => undefined
     }
     const config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
     const client = createSupabaseBrowserClient(config)
     const setSession = (session: Session | null, repository: AppRepository | null, error: string | null = null) => {
-      if (signal?.cancelled) return
-      setState({ user: session?.user || null, userId: session?.user.id || null, accessToken: session?.access_token || null, loading: false, error, backend, repository })
+      if (signal?.cancelled || signingOutRef.current) return
+      setState({ user: session?.user || null, userId: session?.user.id || null, accessToken: session?.access_token || null, loading: false, error, backend, repository, signedOut: false })
     }
     try {
       const session = await getOrCreateAnonymousSession(client)
@@ -66,17 +68,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { signal.cancelled = true; cleanup() }
   }, [attempt, connect])
 
-  const retry = useCallback(() => setAttempt(value => value + 1), [])
+  const retry = useCallback(() => {
+    signingOutRef.current = false
+    setState(current => ({ ...current, signedOut: false, loading: true, error: null }))
+    setAttempt(value => value + 1)
+  }, [])
   const resetSession = useCallback(async () => {
     if (backend !== 'supabase') return
+    signingOutRef.current = true
+    const config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
+    const client = createSupabaseBrowserClient(config)
+    setState(current => ({ ...current, loading: true, error: null }))
+    logoutDiagnostic('sign_out_request_started')
     try {
-      const config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
-      await createSupabaseBrowserClient(config).auth.signOut({ scope: 'local' })
-    } finally {
-      clearPrivateClientState()
-      retry()
+      await signOutAndClear(client)
+      logoutDiagnostic('sign_out_result=success')
+      logoutDiagnostic('cache_cleanup_completed')
+      setState({ user: null, userId: null, accessToken: null, loading: false, error: null, backend, repository: null, signedOut: true })
+      logoutDiagnostic('route_reset_completed')
+    } catch (caught) {
+      logoutDiagnostic('sign_out_result=failure')
+      signingOutRef.current = false
+      setState(current => ({ ...current, loading: false, error: null, signedOut: false }))
+      throw caught
     }
-  }, [backend, retry])
+  }, [backend])
 
   const value = useMemo(() => ({ ...state, retry, resetSession }), [resetSession, retry, state])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

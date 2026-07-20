@@ -9,6 +9,16 @@ const PRIVATE_PREFIXES = [
   'sideshift-onboarding-progress:',
 ]
 
+type LogoutClient = { auth: { signOut: (options: { scope: 'local' }) => Promise<{ error?: unknown | null }> } }
+
+export function logoutDiagnostic(event: string): void {
+  if (import.meta.env.DEV) console.debug(`[SideShift logout] ${event}`)
+}
+
+export function acceptsAnonymousLogoutConfirmation(value: string | null, expected: string): boolean {
+  return value === expected
+}
+
 export function clearPrivateClientState(storage?: Storage | null): void {
   const target = storage || (typeof window !== 'undefined' ? window.localStorage : null)
   if (!target) return
@@ -22,4 +32,10 @@ export function clearPrivateClientState(storage?: Storage | null): void {
   } catch {
     // Logout must still complete when browser storage is unavailable or revoked.
   }
+}
+
+export async function signOutAndClear(client: LogoutClient, clearState: () => void = clearPrivateClientState): Promise<void> {
+  const { error } = await client.auth.signOut({ scope: 'local' })
+  if (error) throw error
+  clearState()
 }

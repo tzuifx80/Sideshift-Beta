@@ -53,7 +53,7 @@ Configure the ignored physical-device API URL, rebuild/sync Android, then manual
 - Android lifecycle backgrounding invalidates the active response and preserves the submitted user turn; resume clears the cached connection promise.
 - The live provider verifier was expanded to three Basic turns and one evaluation. The Basic path passed; the run still stops at the pre-existing feedback-email delivery assertion.
 - Development web assets were synced and `android/app/build/outputs/apk/debug/app-debug.apk` was built successfully. `adb` is unavailable, so installation and physical Android checks remain pending.
-- The shared system picker/media processor is used by both Settings and Friends. Only `@capacitor/app`, `@capacitor/browser`, and `@capacitor/share` are installed; Capacitor Camera was not added.
+- The shared system picker/media processor is used by owner Profile Settings only. Friends is display-only for avatars. Only `@capacitor/app`, `@capacitor/browser`, and `@capacitor/share` are installed; Capacitor Camera was not added.
 
 ### Exact next action
 
@@ -69,3 +69,14 @@ Install `app-debug.apk` on an emulator or physical device with `adb`, run the th
 ### Exact next action
 
 Install the rebuilt debug APK on the real phone, verify 320–412px-equivalent layout at device font scale, then upload/replace/remove a private avatar and confirm the header and profile update before reporting the visual phase complete.
+
+## Android logout and avatar repair checkpoint — 2026-07-20
+
+- Logout no longer retries the anonymous-session bootstrap after local Supabase sign-out. It clears private client storage, ignores late auth callbacks during the transaction, and routes to a signed-out welcome screen; failed sign-out remains retryable.
+- Friends no longer contains avatar editing. Profile photo upload/removal remains owner-only in Profile Settings and only reports success after storage, profile persistence, fresh signed URL resolution, and global avatar-state publication.
+- Android picker blobs now have an object-URL `Image` decode fallback when `createImageBitmap` is unavailable or rejects.
+- Automated focused logout/avatar tests pass. Physical Android picker/upload/replacement/removal, logout/relaunch, and Android Back checks remain pending because `adb` is unavailable.
+
+### Exact next action
+
+Install the debug APK on the physical phone, verify anonymous and secured logout plus gallery upload/replacement/removal, and confirm the header/profile avatar after relaunch.

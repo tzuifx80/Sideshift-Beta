@@ -8,6 +8,7 @@ import { accountSecurityState, type AccountSecurityState } from './accountSecuri
 import { normalizePreferences, normalizeProfile } from './profile'
 import { filterProfileForViewer, validateSocialLink, type ProfileViewerRole } from './profileVisibility'
 import { useTranslations } from './i18n'
+import { acceptsAnonymousLogoutConfirmation, logoutDiagnostic } from './logout'
 
 type Section = 'hub' | 'profile' | 'privacy' | 'debate' | 'appearance' | 'account' | 'help'
 
@@ -26,6 +27,7 @@ type ProfileSettingsProps = {
   onSignOut: () => Promise<void>
   onOpenOnboarding: () => void
   onOpenProfile: (profileKey: string) => void
+  hasUnsavedDraft?: boolean
 }
 
 const socialProviders: SocialProvider[] = ['instagram', 'tiktok', 'youtube', 'twitch', 'github', 'spotify', 'x', 'website']
@@ -39,12 +41,13 @@ function fieldLabel(field: ProfileField, t: ReturnType<typeof useTranslations>):
   return field === 'displayName' ? t('onboarding.displayName') : field === 'profileAccent' ? t('settings.accent') : field === 'statistics' ? t('profileSettings.statistics') : field === 'socialLinks' ? t('profileSettings.socialLinks') : field === 'avatar' ? t('friends.photo') : t('settings.shortBio')
 }
 
-export function ProfileSettings({ profile, preferences, user, userId, repository, language, onSaveProfile, onSavePreferences, onBack, onNotify, onDelete, onSignOut, onOpenOnboarding, onOpenProfile }: ProfileSettingsProps) {
+export function ProfileSettings({ profile, preferences, user, userId, repository, language, onSaveProfile, onSavePreferences, onBack, onNotify, onDelete, onSignOut, onOpenOnboarding, onOpenProfile, hasUnsavedDraft = false }: ProfileSettingsProps) {
   const t = useTranslations(language)
   const [section, setSection] = useState<Section>('hub')
   const [draft, setDraft] = useState(profile)
   const [draftPreferences, setDraftPreferences] = useState(preferences)
   const [busy, setBusy] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [previewRole, setPreviewRole] = useState<ProfileViewerRole>('outsider')
   const security = accountSecurityState(user)
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(profile) || JSON.stringify(draftPreferences) !== JSON.stringify(preferences)
@@ -71,12 +74,26 @@ export function ProfileSettings({ profile, preferences, user, userId, repository
 
   async function upload(file: Blob) {
     setBusy(true)
-    try { const path = await repository.uploadAvatar(userId, file, 'image/webp'); await onSaveProfile(normalizeProfile({ ...draft, avatarPath: path, avatarRevision: (draft.avatarRevision || 0) + 1 })); onNotify(t('profileSettings.profileSaved')) } catch (caught) { onNotify(caught instanceof Error ? caught.message : t('friends.unavailable')) } finally { setBusy(false) }
+    try {
+      const path = await repository.uploadAvatar(userId, file, 'image/webp')
+      const signedUrl = await repository.getAvatarUrl(userId, path)
+      if (!signedUrl) throw new Error('The new profile photo is not available yet.')
+      const next = normalizeProfile({ ...draft, avatarPath: path, avatarRevision: (draft.avatarRevision || 0) + 1 })
+      await onSaveProfile(next)
+      setDraft(next)
+      onNotify(t('profileSettings.profileSaved'))
+    } catch { onNotify(t('friends.photoUnavailable')) } finally { setBusy(false) }
   }
 
   async function removeAvatar() {
     setBusy(true)
-    try { await repository.removeAvatar(userId); await onSaveProfile(normalizeProfile({ ...draft, avatarPath: null, avatarRevision: (draft.avatarRevision || 0) + 1 })); onNotify(t('profileSettings.profileSaved')) } catch (caught) { onNotify(caught instanceof Error ? caught.message : t('friends.unavailable')) } finally { setBusy(false) }
+    try { const next = normalizeProfile({ ...draft, avatarPath: null, avatarRevision: (draft.avatarRevision || 0) + 1 }); await repository.removeAvatar(userId); await onSaveProfile(next); setDraft(next); onNotify(t('profileSettings.profileSaved')) } catch { onNotify(t('friends.photoUnavailable')) } finally { setBusy(false) }
+  }
+
+  async function signOut() {
+    if (busy || signingOut) return
+    setSigningOut(true)
+    try { await onSignOut() } catch { onNotify(t('profileSettings.signOutError')) } finally { setSigningOut(false) }
   }
 
   function addLink() {
@@ -109,7 +126,7 @@ export function ProfileSettings({ profile, preferences, user, userId, repository
     {section === 'privacy' && <><section className="settings-section card-surface"><div className="settings-section-heading"><div><span className="eyebrow">{t('profileSettings.privacy')}</span><h2>{t('profileSettings.profileVisibility')}</h2></div><Icon name="lock" size={20} /></div><label className="field-label">{t('profileSettings.profileVisibility')}<select className="settings-select" value={draft.profileVisibility} onChange={event => setDraft(current => ({ ...current, profileVisibility: event.target.value as ProfileVisibility }))}>{(['private', 'friends', 'shared_groups', 'public'] as ProfileVisibility[]).map(value => <option key={value} value={value}>{visibilityLabel(value, t)}</option>)}</select></label><p className="field-help">{t('settings.privacyInfo')}</p>{profileFields.map(field => <label className="field-label" key={field}>{fieldLabel(field, t)}<select className="settings-select" value={draft.fieldVisibility[field]} onChange={event => setDraft(current => ({ ...current, fieldVisibility: { ...current.fieldVisibility, [field]: event.target.value as ProfileVisibility } }))}>{(['private', 'friends', 'shared_groups', 'public'] as ProfileVisibility[]).map(value => <option key={value} value={value}>{visibilityLabel(value, t)}</option>)}</select></label>)}<span className="field-label">{t('profileSettings.statistics')}</span>{(['debates', 'sideSwitches', 'constructive', 'argumentDna'] as const).map(stat => <label className="toggle-row" key={stat}><input type="checkbox" checked={draft.visibleStats[stat]} onChange={event => setDraft(current => ({ ...current, visibleStats: { ...current.visibleStats, [stat]: event.target.checked } }))} /><span>{stat === 'debates' ? t('friends.statDebates') : stat === 'sideSwitches' ? t('friends.statSideSwitches') : stat === 'constructive' ? t('friends.statConstructive') : t('friends.statArgumentDna')}</span></label>)}</section><section className="settings-section card-surface"><h2>{t('profileSettings.preview')}</h2><label className="field-label">{t('profileSettings.previewAs')}<select className="settings-select" value={previewRole} onChange={event => setPreviewRole(event.target.value as ProfileViewerRole)}><option value="outsider">{t('profileSettings.publicViewer')}</option><option value="friend">{t('profileSettings.friendViewer')}</option><option value="shared_group">{t('profileSettings.groupViewer')}</option></select></label><div className="profile-preview-box"><strong>{String(preview.displayName || t('profileSettings.privateProfile'))}</strong>{Boolean(preview.bio) && <p>{String(preview.bio)}</p>}{Array.isArray(preview.socialLinks) && preview.socialLinks.length > 0 && <small>{t('profileSettings.socialLinks')}: {preview.socialLinks.length}</small>}</div><Button variant="secondary" onClick={() => profile.publicProfileKey && onOpenProfile(profile.publicProfileKey)} disabled={!profile.publicProfileKey}>{t('profileSettings.preview')}</Button></section></>}
     {section === 'debate' && <section className="settings-section card-surface"><label className="field-label">{t('settings.interfaceLanguage')}<select className="settings-select" value={draftPreferences.debateLanguages[0]} onChange={event => setDraftPreferences(current => ({ ...current, debateLanguages: [event.target.value as Language] }))}><option value="en">English</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="es">Español</option><option value="it">Italiano</option></select></label><label className="field-label">{t('settings.defaultMode')}<select className="settings-select" value={draftPreferences.preferredMode} onChange={event => setDraftPreferences(current => ({ ...current, preferredMode: event.target.value as Mode }))}><option value="sideswitch">SideSwitch</option><option value="classic">Classic</option><option value="blindside">Blindside</option><option value="commonground">CommonGround</option></select></label><label className="field-label">{t('settings.aiFamily')}<select className="settings-select" value={draftPreferences.preferredAiFamily} onChange={event => setDraftPreferences(current => ({ ...current, preferredAiFamily: event.target.value as UserPreferences['preferredAiFamily'] }))}><option value="GPT">GPT</option><option value="Gemini">Gemini</option><option value="Claude">Claude</option><option value="DeepSeek">DeepSeek</option></select></label><label className="field-label">{t('settings.responseLength')}<select className="settings-select" value={draftPreferences.aiResponseLength} onChange={event => setDraftPreferences(current => ({ ...current, aiResponseLength: event.target.value as UserPreferences['aiResponseLength'] }))}><option value="concise">Concise</option><option value="standard">Standard</option><option value="detailed">Detailed</option></select></label></section>}
     {section === 'appearance' && <section className="settings-section card-surface"><label className="field-label">{t('settings.theme')}<select className="settings-select" value={draftPreferences.theme} onChange={event => setDraftPreferences(current => ({ ...current, theme: event.target.value as UserPreferences['theme'] }))}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><label className="field-label">{t('settings.textSize')}<select className="settings-select" value={draftPreferences.textSize} onChange={event => setDraftPreferences(current => ({ ...current, textSize: event.target.value as UserPreferences['textSize'] }))}><option value="compact">Standard</option><option value="comfortable">Large</option></select></label><label className="toggle-row"><input type="checkbox" checked={draftPreferences.reducedMotion} onChange={event => setDraftPreferences(current => ({ ...current, reducedMotion: event.target.checked }))} /><span>{t('settings.reduceMotion')}</span></label></section>}
-    {section === 'account' && <section className="settings-section card-surface"><div className="settings-section-heading"><div><span className="eyebrow">{t('profileSettings.security')}</span><h2>{security === 'anonymous' ? t('profileSettings.anonymous') : security === 'email' ? t('profileSettings.email') : t('profileSettings.oauth')}</h2></div><Icon name="shield" size={20} /></div>{security === 'anonymous' && <p className="form-warning" role="alert">{t('profileSettings.anonymousWarning')}</p>}<p className="field-help">{t('profileSettings.accountBody')}</p><Button variant="secondary" onClick={() => { if (security === 'anonymous') { const phrase = window.prompt(`${t('profileSettings.signOutWarning')}\n\n${t('profileSettings.signOutConfirm')}`); if (phrase !== t('profileSettings.signOutConfirm')) return } else if (!window.confirm(t('profileSettings.signOut'))) return; void onSignOut() }}>{t('profileSettings.signOut')}</Button><Button variant="ghost" onClick={onDelete}>{t('shell.deleteData')}</Button></section>}
+    {section === 'account' && <section className="settings-section card-surface"><div className="settings-section-heading"><div><span className="eyebrow">{t('profileSettings.security')}</span><h2>{security === 'anonymous' ? t('profileSettings.anonymous') : security === 'email' ? t('profileSettings.email') : t('profileSettings.oauth')}</h2></div><Icon name="shield" size={20} /></div>{security === 'anonymous' && <p className="form-warning" role="alert">{t('profileSettings.anonymousWarning')}</p>}<p className="field-help">{t('profileSettings.accountBody')}</p><Button variant="secondary" onClick={() => { if ((hasChanges || hasUnsavedDraft) && !window.confirm(t('profileSettings.unsavedSignOut'))) return; if (security === 'anonymous') { const phrase = window.prompt(`${t('profileSettings.signOutWarning')}\n\n${t('profileSettings.signOutConfirm')}`); if (!acceptsAnonymousLogoutConfirmation(phrase, t('profileSettings.signOutConfirm'))) return } else if (!window.confirm(t('profileSettings.signOut'))) return; logoutDiagnostic('confirmation_accepted'); void signOut() }} disabled={busy || signingOut}>{signingOut ? t('common.saving') : t('profileSettings.signOut')}</Button><Button variant="ghost" onClick={onDelete} disabled={busy || signingOut}>{t('shell.deleteData')}</Button></section>}
     {section === 'help' && <section className="settings-section card-surface"><Button variant="secondary" onClick={onOpenOnboarding}>{t('profileSettings.help')}</Button><p className="field-help">{t('profileSettings.helpBody')}</p><span className="muted">SideShift beta</span></section>}
   </div>
 }
