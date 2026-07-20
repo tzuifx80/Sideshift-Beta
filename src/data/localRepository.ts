@@ -122,7 +122,7 @@ export function createLocalRepository(): AppRepository {
         saveState(state)
       }
       const canRespond = record.status === 'open'
-      return { id: record.id, token: record.token, url: `/challenge/${record.token}`, expiresAt: record.expiresAt, takeId: record.takeId, argument: record.argument, mode: record.mode, creatorSide: record.creatorSide, status: record.status, response: record.response, result: record.result, canRespond } satisfies ChallengeResolved
+      return { id: record.id, token: record.token, url: `/challenge/${record.token}`, expiresAt: record.expiresAt, takeId: record.takeId, argument: record.argument, mode: record.mode, creatorSide: record.creatorSide, status: record.status, response: record.response, result: record.result, creator: null, canRespond } satisfies ChallengeResolved
     },
     async listChallenges(userId) {
       const state = cloneState()
@@ -155,7 +155,7 @@ export function createLocalRepository(): AppRepository {
       record.result = { total: Math.max(0, Math.min(100, 40 + Math.round(response.length / 4))) }
       record.completedAt = new Date().toISOString()
       saveState(state)
-      return { id: record.id, token: record.token, url: `/challenge/${record.token}`, expiresAt: record.expiresAt, takeId: record.takeId, argument: record.argument, mode: record.mode, creatorSide: record.creatorSide, status: record.status, response: record.response, result: record.result, canRespond: false } satisfies ChallengeResolved
+      return { id: record.id, token: record.token, url: `/challenge/${record.token}`, expiresAt: record.expiresAt, takeId: record.takeId, argument: record.argument, mode: record.mode, creatorSide: record.creatorSide, status: record.status, response: record.response, result: record.result, creator: null, canRespond: false } satisfies ChallengeResolved
     },
     async submitReport(userId, payload: ReportInput) {
       const state = cloneState()

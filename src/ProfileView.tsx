@@ -10,6 +10,15 @@ export function ProfileViewScreen({ userId, profileKey, language, repository, on
   const [view, setView] = useState<ProfileViewData | null>(null)
   const [error, setError] = useState(false)
   useEffect(() => {
+    const handleNativeBack = (event: Event) => {
+      if (event.defaultPrevented) return
+      event.preventDefault()
+      onBack()
+    }
+    window.addEventListener('sideshift-native-back', handleNativeBack, { capture: true })
+    return () => window.removeEventListener('sideshift-native-back', handleNativeBack, { capture: true })
+  }, [onBack])
+  useEffect(() => {
     let active = true
     setView(null); setError(false)
     void repository.getProfileForViewer(userId, profileKey).then(next => { if (active) setView(next) }).catch(() => { if (active) setError(true) })

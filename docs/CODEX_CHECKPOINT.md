@@ -5,9 +5,9 @@
 - Profile/settings is split into a mobile hub with Profile, Privacy and safety, Debate preferences, Appearance/accessibility, Account/data, and Help/app sections.
 - `get_profile_for_viewer` is the server boundary for other profiles. The remote four-viewer verifier passes owner, accepted friend, shared-Group member, outsider, hidden social URL omission, and blocked neutral-unavailable behavior.
 - Social links are capped at five, normalized to HTTPS, checked against known provider domains, and filtered by overall plus per-link visibility. Selected statistics are filtered before JSON leaves the RPC.
-- Friends and exact-handle previews open the new profile detail. Group/challenge/history participant click-through remains a follow-up limitation.
-- Migrations `0021`, `0022`, and `0023` are applied locally and remotely; no migration `0001`–`0020` was edited.
-- Final automated evidence: 27 Vitest files / 92 tests, typecheck, lint, env validation, provider configuration, encoding, PWA, frontend secret scan, dependency audit, production placeholder build, development build, Capacitor sync, and Android debug APK compilation.
+- Friends, Group member rows, direct friend-challenge participants, and bearer-link challenge creators open the same privacy-aware profile detail. AI opponents remain non-clickable; the current debate history has no human participant identity rows.
+- Migrations `0021`–`0024` are applied locally and remotely; no migration `0001`–`0023` was edited.
+- Final automated evidence: 29 Vitest files / 95 tests, typecheck, lint, env validation, provider configuration, encoding, PWA, frontend secret scan, dependency audit, production placeholder build, development build, Capacitor sync, Android debug APK compilation, and the four-viewer profile/RLS verifier.
 - APK: `android/app/build/outputs/apk/debug/app-debug.apk`. `adb` and browser screenshot automation remain unavailable, so physical phone layout, Android Back/logout, and avatar media checks are pending.
 
 ## Objective
@@ -16,7 +16,7 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 
 ## Confirmed facts
 
-- Supabase migrations are applied locally and remotely through `0023`.
+- Supabase migrations are applied locally and remotely through `0024`.
 - Social mutations use authenticated RPCs; local repository mode remains explicitly device-only and exposes no simulated multi-user friendship.
 - The avatar bucket is private, uses opaque profile-key paths, owner-only writes, and signed reads gated by profile privacy and blocking.
 - Exact discovery returns only an opaque profile key, handle, display name, preset/accent metadata, and no bio/avatar path until privacy permits it.
@@ -31,7 +31,7 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 
 - `npm run typecheck`, `npm run lint`, targeted Vitest, `npm test`, `npm run build`, `npm run test:supabase`, `npm run test:supabase:private-social`, `npm run test:supabase:collaboration`, `npm run test:playwright:person`, `npm run test:playwright:supabase`, and `npm run test:playwright:team` pass.
 - Three-user remote social/RLS test passes exact lookup, opposite-direction request resolution, duplicate prevention, outsider denial, avatar signed-read boundaries, Group invitation acceptance, blocking revocation, and cleanup.
-- Remote migrations `0016`–`0023` are applied.
+- Remote migrations `0016`–`0024` are applied.
 
 ## Important limitations
 

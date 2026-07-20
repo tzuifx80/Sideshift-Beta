@@ -229,10 +229,11 @@ export function mapChallengeRow(value: unknown): ChallengeRecord {
     status: row.status === 'completed' || row.status === 'expired' || row.status === 'revoked' ? row.status : 'open',
     response: typeof row.response === 'string' ? row.response : null,
     result: row.result && typeof row.result === 'object' ? { total: Number(asRow(row.result).total) } : null,
+    creator: row.creator,
   }
   const parsed = challengeRecordSchema.safeParse(normalized)
   if (!parsed.success) throw new RepositoryErrorClass('validation', 'Supabase returned invalid challenge data.')
-  return parsed.data
+  return { ...parsed.data, creator: mapProfilePreview(parsed.data.creator) }
 }
 
 export function mapResultRow(value: unknown): ResultData {
@@ -291,7 +292,7 @@ function mapGroupFriendInvitation(value: unknown): GroupFriendInvitation {
 }
 
 const groupSummarySchema = z.object({ id: z.string().uuid(), name: z.string().min(1).max(60), description: z.string().max(240), icon: z.string().max(8), accent: z.string().max(32), language: languageSchema, role: z.enum(['owner', 'moderator', 'member']), memberCount: z.number().int().min(0), leaderboardEnabled: z.boolean(), updatedAt: z.string() })
-const groupMemberSchema = z.object({ userId: z.string().uuid(), displayName: z.string().min(1).max(80), role: z.enum(['owner', 'moderator', 'member']), points: z.number().int().min(0), debatesCompleted: z.number().int().min(0), constructive: z.boolean() })
+const groupMemberSchema = z.object({ userId: z.string().uuid(), profileKey: z.string().uuid().nullable().optional(), displayName: z.string().min(1).max(80), role: z.enum(['owner', 'moderator', 'member']), points: z.number().int().min(0), debatesCompleted: z.number().int().min(0), constructive: z.boolean() })
 const groupTopicSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), statement: z.string().min(8).max(240), context: z.string().max(600), sideLabels: z.tuple([z.string().min(1).max(28), z.string().min(1).max(28)]), category: z.string().min(1).max(60), language: languageSchema, sensitivity: z.enum(['standard', 'sensitive']), creatorId: z.string().uuid(), status: z.enum(['approved', 'pending', 'archived']), createdAt: z.string() })
 const groupInviteSchema = z.object({ id: z.string().uuid(), groupId: z.string().uuid(), code: z.string().max(80), expiresAt: z.string().nullable(), maxUses: z.number().int().positive().nullable(), uses: z.number().int().min(0), revoked: z.boolean() })
 

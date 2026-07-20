@@ -59,6 +59,10 @@ const invite = await a.client.rpc('create_group_invite', { p_group_id: group.dat
 if (invite.error) fail('Group invite setup failed')
 const joined = await c.client.rpc('join_group_by_invite', { p_code: invite.data.code })
 if (joined.error) fail('shared Group setup failed')
+const groupDetail = await a.client.rpc('load_group', { p_group_id: group.data.id })
+if (groupDetail.error) fail('Group member profile payload failed')
+const groupMemberRow = Array.isArray(groupDetail.data?.members) ? groupDetail.data.members.find(member => member.userId === c.id) : null
+assert(groupMemberRow?.profileKey === cKey, 'Group member profile key was missing')
 
 const inspect = async (client, key) => client.rpc('get_profile_for_viewer', { p_profile_key: key })
 const owner = await inspect(a.client, aKey)

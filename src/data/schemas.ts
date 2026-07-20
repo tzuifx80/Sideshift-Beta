@@ -84,6 +84,7 @@ export const challengeRecordSchema = z.object({
   status: z.enum(['open', 'completed', 'expired', 'revoked']),
   response: z.string().nullable(),
   result: z.object({ total: z.number().int().min(0).max(100) }).nullable(),
+  creator: z.unknown().nullable().optional(),
 })
 
 export const teamDebateSessionSchema: z.ZodType<TeamDebateSession> = z.object({

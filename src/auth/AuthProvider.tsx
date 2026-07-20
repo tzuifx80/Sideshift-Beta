@@ -5,6 +5,7 @@ import { selectRepository } from '../data/selectRepository'
 import { createSupabaseBrowserClient, getOrCreateAnonymousSession, readSupabaseConfig } from '../data/supabaseClient'
 import type { AppRepository } from '../data/repository'
 import { defaultProfileFieldVisibility } from '../profile'
+import { clearPrivateClientState } from '../logout'
 
 export type AuthState = {
   user: User | null
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
       await createSupabaseBrowserClient(config).auth.signOut({ scope: 'local' })
     } finally {
+      clearPrivateClientState()
       retry()
     }
   }, [backend, retry])

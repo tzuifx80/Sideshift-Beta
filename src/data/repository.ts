@@ -14,6 +14,7 @@ export type ChallengeRecord = {
   status: 'open' | 'completed' | 'expired' | 'revoked'
   response: string | null
   result: { total: number } | null
+  creator?: ProfilePreview | null
 }
 
 export type ChallengeResolved = ChallengeRecord & { canRespond: boolean }

@@ -102,6 +102,7 @@ export type GroupSummary = {
 
 export type GroupMember = {
   userId: string
+  profileKey?: string | null
   displayName: string
   role: GroupRole
   points: number

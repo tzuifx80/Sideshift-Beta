@@ -3,7 +3,7 @@
 ## 2026-07-20 Profile & Settings 2.0
 
 - Profile viewing uses the server-authoritative `get_profile_for_viewer` boundary. Hidden fields, statistics, and social URLs are omitted from the response.
-- Migrations `0021`–`0023` add public visibility, field visibility, validated social links, selected-stat filtering, and the viewer-aware profile RPC without rewriting `0001`–`0020`.
+- Migrations `0021`–`0024` add public visibility, field visibility, validated social links, selected-stat filtering, the viewer-aware profile RPC, and privacy-filtered profile navigation payloads without rewriting `0001`–`0023`.
 - Social links are limited to five HTTPS URLs with known-provider host checks and no ownership claim. External navigation uses `noopener noreferrer`.
 - Supabase currently provisions anonymous sessions only in this beta. Settings identifies that state and requires a strong confirmation before anonymous sign-out; email/OAuth upgrade is not falsely advertised.
 
