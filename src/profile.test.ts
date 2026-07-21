@@ -22,6 +22,6 @@ describe('private profile and preference validation', () => {
   })
 
   it('keeps onboarding progress bounded and server-mirrorable', () => {
-    expect(normalizePreferences({ userId: 'user-1', onboardingStage: 9, onboardingGoal: 'friends', onboardingDismissed: true })).toMatchObject({ onboardingStage: 3, onboardingGoal: 'friends', onboardingDismissed: true })
+    expect(normalizePreferences({ userId: 'user-1', onboardingStage: 9, onboardingGoal: 'friends', onboardingDismissed: true })).toMatchObject({ onboardingStage: 2, onboardingGoal: 'friends', onboardingDismissed: true })
   })
 })

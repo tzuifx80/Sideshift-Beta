@@ -4,7 +4,7 @@ import type { LocaleMessages, TranslationKey } from './types'
 type GroupMessages = Partial<Record<TranslationKey, string>>
 
 export const groupMessages: Record<Language, GroupMessages> = {
-  en: { 'groups.roleOwner': 'Owner', 'groups.roleModerator': 'Moderator', 'groups.roleMember': 'Member', 'groups.points': '{count} points', 'groups.constructivePoints': 'Constructive points' },
+  en: { 'groups.roleOwner': 'Owner', 'groups.roleModerator': 'Moderator', 'groups.roleMember': 'Member', 'groups.points': '{count} points', 'groups.constructivePoints': 'Constructive points', 'groups.shareInvite': 'Share invite', 'groups.overview': 'Overview' },
   de: { 'groups.roleOwner': 'Besitzer', 'groups.roleModerator': 'Moderation', 'groups.roleMember': 'Mitglied', 'groups.points': '{count} Punkte', 'groups.constructivePoints': 'Konstruktive Punkte' },
   fr: { 'groups.roleOwner': 'Propriétaire', 'groups.roleModerator': 'Modération', 'groups.roleMember': 'Membre', 'groups.points': '{count} points', 'groups.constructivePoints': 'Points constructifs' },
   es: { 'groups.roleOwner': 'Propietario', 'groups.roleModerator': 'Moderación', 'groups.roleMember': 'Miembro', 'groups.points': '{count} puntos', 'groups.constructivePoints': 'Puntos constructivos' },

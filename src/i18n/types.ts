@@ -22,7 +22,7 @@ export type TranslationKey =
   | 'league.title' | 'league.friends' | 'league.group' | 'league.body' | 'league.season' | 'league.standings' | 'league.points' | 'league.join' | 'league.leave' | 'league.joined' | 'league.notJoined' | 'league.rules' | 'league.rulesBody' | 'league.breakdown' | 'league.award' | 'league.awards' | 'league.pastSeasons' | 'league.noActivity' | 'league.noParticipants' | 'league.privateOnly' | 'league.position' | 'league.ending' | 'league.loading' | 'league.error' | 'league.completedDebate' | 'league.sideSwitch' | 'league.topicVariety' | 'league.friendChallenge' | 'league.teamDebate' | 'league.constructive' | 'league.consistency' | 'league.you' | 'league.member' | 'league.mostImproved' | 'league.bestRebuttal' | 'league.bestListener' | 'league.sideSwitchSpecialist' | 'league.topicExplorer' | 'league.mostConsistent' | 'league.teamContributor'
   | 'status.connecting' | 'status.privateSession' | 'status.privateUnavailable' | 'status.backendUnavailable' | 'status.loadingSpace' | 'status.backendMessage' | 'status.retryConnection' | 'status.retrySession'
   | `classic.${string}` | `results.${string}` | `clash.${string}` | `ai.${string}` | `ai.active.${string}` | `onboarding.${string}`
-  | `profileSettings.${string}`
+  | `profileSettings.${string}` | `auth.${string}` | `groups.${string}` | `friends.${string}`
 
 export type LocaleMessages = Record<TranslationKey, string>
 export type Translator = (key: TranslationKey, values?: Record<string, string | number>) => string

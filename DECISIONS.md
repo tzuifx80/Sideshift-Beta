@@ -1,5 +1,14 @@
 # Decisions
 
+## 2026-07-21 Production auth, hosted Basic, and final mobile correction
+
+- Signed-out state stays durable until a deliberate authentication action succeeds. Continue as guest calls anonymous sign-in; email sign-in uses `signInWithOtp({ options: { shouldCreateUser: false } })` so an unknown email is not silently turned into a new account.
+- Account security uses `updateUser({ email })` followed by `verifyOtp({ type: 'email_change' })`, preserving the anonymous user's UUID and all data. The OTP UI is six digits with a 30-second resend cooldown and safe, non-enumerating error categories.
+- The production Basic boundary is the Cloudflare Worker. It validates `Authorization: Bearer` against Supabase Auth, derives the user ID, rejects mismatched legacy identity headers, and uses only the pre-existing service-role quota RPCs because those functions explicitly require the service role. The client never receives that key.
+- Worker AI uses the direct Workers AI binding with `@cf/qwen/qwen3-30b-a3b-fp8` by default, preserves `/no_think` for Qwen 3, keeps the Node API for local development, and returns explicit unavailable/quota/rate-limit/idempotency states.
+- The old onboarding mode-choice stage was removed from the live component and translations. Debate-mode selection remains on the Home Start Debate path. Group and Friends feature ownership is expressed through compact tabs instead of unrelated large cards.
+- No migration was added: invite formatting is presentation-only and the existing hashed, expiring, rate-limited invitation storage/RPC boundary remains unchanged. Applied migrations `0001`-`0032` were not edited.
+
 ## 2026-07-21 Persistent signed-out state and final mobile IA
 
 - A missing Supabase session is an explicit signed-out state; anonymous bootstrap is opt-in and can run only after the user selects Continue as guest. Existing sessions are still reused.
@@ -24,7 +33,7 @@
 - Profile viewing uses the server-authoritative `get_profile_for_viewer` boundary. Hidden fields, statistics, and social URLs are omitted from the response.
 - Migrations `0021`–`0024` add public visibility, field visibility, validated social links, selected-stat filtering, the viewer-aware profile RPC, and privacy-filtered profile navigation payloads without rewriting `0001`–`0023`.
 - Social links are limited to five HTTPS URLs with known-provider host checks and no ownership claim. External navigation uses `noopener noreferrer`.
-- Supabase currently provisions anonymous sessions only in this beta. Settings identifies that state and requires a strong confirmation before anonymous sign-out; email/OAuth upgrade is not falsely advertised.
+- Supabase still provisions anonymous sessions for the beta, but Settings now offers a real email OTP account-security path that links the email to the existing anonymous identity; no OAuth provider was added.
 
 ## 2026-07-20 Android logout and avatar repair
 
@@ -41,7 +50,7 @@
 
 ## 2026-07-20 Mobile UX and avatar synchronization
 
-- The active introduction now follows welcome → debate choice → SideSwitch → personalize; it remains skippable, resumable, keyboard-safe, and re-openable without erasing preferences.
+- The active introduction now follows welcome → SideSwitch → personalize/start; it remains skippable, resumable, keyboard-safe, and re-openable without erasing preferences.
 - Profile photo replacement keeps the private `current.webp` object path but increments a client-only avatar revision. The shared profile-avatar snapshot appends that revision to signed image URLs, so header/profile state updates immediately without disabling normal caching or making the bucket public.
 - The mobile surface uses shared responsive tokens, 16px form text, 44–48px controls, safe-area padding, compact editorial cards, and a five-destination bottom navigation. No architecture or migration changes were introduced.
 

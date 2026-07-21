@@ -54,6 +54,17 @@ describe('Supabase authentication bootstrap', () => {
     expect(signInAnonymously).toHaveBeenCalledOnce()
   })
 
+  it('keeps the signed-out marker until the verified guest continuation succeeds', async () => {
+    const guestSession = { user: { id: 'new-guest' }, access_token: 'new-token' }
+    const signInAnonymously = vi.fn(async () => ({ data: { session: guestSession }, error: null }))
+    const client = { auth: { getSession: vi.fn(async () => ({ data: { session: null }, error: null })), signInAnonymously } } as unknown as SupabaseClient
+    const storage = storageFixture({ 'sideshift-signed-out-v1': '1' })
+    const bootstrap = getOrCreateAnonymousSession as unknown as (client: SupabaseClient, options: { storage: Storage; allowAnonymousCreation?: boolean; allowSignedOutContinuation?: boolean }) => Promise<unknown>
+
+    await expect(bootstrap(client, { storage, allowAnonymousCreation: true, allowSignedOutContinuation: true })).resolves.toBe(guestSession)
+    expect(storage.getItem('sideshift-signed-out-v1')).toBe('1')
+  })
+
   it('does not return a newly created session when logout is requested during bootstrap', async () => {
     const storage = storageFixture({})
     const replacementSession = { user: { id: 'late-guest' }, access_token: 'late-token' }

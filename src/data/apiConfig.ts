@@ -51,7 +51,7 @@ export function resolveApiBaseUrl(input: ApiConfigInput = {}): string {
   if (platform === 'android' || platform === 'native') {
     if (configured) return configured
     if (platform === 'android' && input.androidTarget === 'emulator') return emulatorBaseUrl
-    throw new ApiConfigurationError('SideShift server is unreachable because this Android development build has no VITE_API_BASE_URL. Set it to the PC LAN API URL and rebuild.')
+    throw new ApiConfigurationError('SideShift server is not configured for this Android build. Set VITE_API_BASE_URL to the hosted HTTPS Worker, or explicitly provide a local development API URL.')
   }
 
   return configured

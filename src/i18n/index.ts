@@ -15,6 +15,8 @@ import { phase3Messages, phase3OnboardingMessages } from './phase3'
 import { phase4OnboardingMessages } from './phase4Onboarding'
 import { phase5ProfileMessages } from './phase5Profile'
 import { phase6PulseLeagueMessages } from './phase6PulseLeague'
+import { authMessages } from './auth'
+import { friendsMessages } from './friends'
 import type { LocaleMessages, TranslationKey, Translator } from './types'
 
 export { supportedLanguages } from './types'
@@ -29,6 +31,16 @@ const locales: Record<Language, LocaleMessages> = {
   es: Object.assign({}, es, phase2Messages.es, phase3Messages.es, phase3OnboardingMessages.es, phase4OnboardingMessages.es, phase5ProfileMessages.es, phase6PulseLeagueMessages.es, debateMessages.es, stanceMessages.es, resultsMessages.es, activeAiMessages.es, teamMessages.es, responseMessages.es, groupMessages.es) as LocaleMessages,
   it: Object.assign({}, it, phase2Messages.it, phase3Messages.it, phase3OnboardingMessages.it, phase4OnboardingMessages.it, phase5ProfileMessages.it, phase6PulseLeagueMessages.it, debateMessages.it, stanceMessages.it, resultsMessages.it, activeAiMessages.it, teamMessages.it, responseMessages.it, groupMessages.it) as LocaleMessages,
 }
+Object.assign(locales.en, authMessages.en)
+Object.assign(locales.de, authMessages.de)
+Object.assign(locales.fr, authMessages.fr)
+Object.assign(locales.es, authMessages.es)
+Object.assign(locales.it, authMessages.it)
+Object.assign(locales.en, friendsMessages.en)
+Object.assign(locales.de, friendsMessages.de)
+Object.assign(locales.fr, friendsMessages.fr)
+Object.assign(locales.es, friendsMessages.es)
+Object.assign(locales.it, friendsMessages.it)
 export const localeMessages = locales
 
 export function isLanguage(value: unknown): value is Language { return value === 'en' || value === 'de' || value === 'fr' || value === 'es' || value === 'it' }

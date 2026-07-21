@@ -1,5 +1,17 @@
 # Codex Checkpoint
 
+## Production auth, hosted Basic, and final mobile correction checkpoint - 2026-07-21
+
+- Auth flow now has explicit guest creation, email OTP sign-in without implicit account creation, and email-change OTP to secure an active anonymous account without changing its UUID. Auth errors are mapped to safe UI categories; the signed-out marker clears only after verified success.
+- The live onboarding route is three stages: Welcome, SideSwitch, Personalize/start. Group detail uses compact tabs and grouped invite display; Friends uses Friends, Requests, and League tabs.
+- `worker/` contains the Wrangler/Workers AI implementation, scoped CORS, Supabase bearer validation, existing quota RPC calls, health/capability routes, deployment README, and `scripts/verify-worker.mjs`. Local Worker tests pass; Wrangler dry-run passes with explicit production bindings.
+- Applied migrations remain unchanged through `0032`; no invite migration was needed because display formatting is derived from the existing secure token.
+- Verification: 35 Vitest files / 125 tests, typecheck, lint, encoding, PWA, frontend secret scan, dependency audit, production HTTPS-placeholder build, Worker tests, and Wrangler dry-run pass. Real deployment credentials, Supabase Dashboard OTP/linking configuration, and physical Android retest remain pending.
+
+### Exact next action
+
+Enable Supabase manual linking and the OTP email template, authenticate Wrangler, set Worker secrets, deploy the production environment, then build the APK with that HTTPS Worker URL and repeat the physical three-turn/visual matrix with the PC stopped.
+
 ## Final mobile structure and persistent logout checkpoint - 2026-07-21
 
 - Root cause confirmed: logout previously changed only React memory. After Android WebView restart, no durable signed-out marker existed, so `getOrCreateAnonymousSession` saw no session and immediately created a replacement anonymous account.
@@ -41,7 +53,7 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 - Blocking atomically marks the relationship blocked, revokes open direct challenges, and revokes pending targeted Group invitations.
 - Existing bearer-link challenge RPCs reject direct friend challenges and remain unchanged for bearer-link users.
 - Supabase preference hydration now accepts legacy nullable/missing fields, snake_case or camelCase aliases, and legacy JSON-array strings while retaining strict type checks and safe defaults.
-- SideShift server requests now use one environment-aware API client. Browser development uses the Vite relative proxy, Android emulator development can use `10.0.2.2`, physical Android development requires an explicit ignored `VITE_API_BASE_URL`, and production requires a public HTTPS API URL.
+- SideShift server requests now use one environment-aware API client. Browser development uses the Vite relative proxy, while Android hosted/debug builds require an explicit `VITE_API_BASE_URL` for the HTTPS Worker; local emulator/PC API values remain explicit development-only overrides.
 - Basic AI capability, generation and evaluation requests share the configured API client; development diagnostics expose only host/path, status and safe outcome categories.
 - Profile settings now provide system gallery/camera entry points with cancellation handling and a processed 512px WebP preview before upload. Physical gallery/camera behavior remains unverified.
 
@@ -56,7 +68,7 @@ Complete SideShift Phase 4: private profiles, secure avatar media, exact-handle/
 - Preference parser and authentication-bootstrap regression coverage passes; structural rejection diagnostics contain only field names, types, null/missing fields, and validation paths.
 - Added `scripts/private_social_flow.py` and `npm run test:playwright:private-social` for the focused three-context browser acceptance flow. The run reached the exact-handle lookup and pending-request path, but final remote execution was stopped after Supabase anonymous-auth rate limiting reported `Private session unavailable / Request rate limit reached` for the third isolated context. No further anonymous-auth retries were performed.
 - Physical Android camera/gallery verification remains pending; the web path uses browser-native canvas processing and the existing Capacitor foundation is not changed.
-- Android Basic routing was previously blocked because `BasicAiProvider` bypassed `VITE_API_BASE_URL` and used WebView-relative `/api` paths. The fix is implemented, but physical-device reachability still requires a configured PC LAN URL and a manual retest.
+- Android Basic routing was previously blocked because `BasicAiProvider` bypassed `VITE_API_BASE_URL` and used WebView-relative `/api` paths. The fix is implemented; physical-device reachability now requires the deployed Worker URL and a manual retest.
 - `npm run verify:providers:live` reached its Basic capability, live generation, idempotent replay, and structured evaluation assertions, then failed at the unrelated feedback-email delivery assertion (`delivery_status: failed` instead of `sent`). It was not retried to avoid extra provider calls.
 - The focused Friends browser flow is implemented but remains remotely unverified because anonymous authentication rate limiting blocked the final run. The earlier three-user RPC/RLS acceptance remains passing.
 - The repository still contains existing bundle warnings unrelated to this phase.
@@ -79,7 +91,7 @@ Install `app-debug.apk` on an emulator or physical device with `adb`, run the th
 
 ## Mobile UX and avatar synchronization checkpoint — 2026-07-20
 
-- The active onboarding tree is now a concise four-stage mobile introduction: welcome, debate modes, SideSwitch, and personalization/first debate. Progress remains in the existing per-user local/server hydration path.
+- The active onboarding tree is now a concise three-stage mobile introduction: welcome, SideSwitch, and personalization/first debate. Progress remains in the existing per-user local/server hydration path.
 - Header and profile avatar rendering consume the shared profile-avatar snapshot. Upload, replacement, and removal update the client-only revision while retaining the private `publicProfileKey/current.webp` path and signed access.
 - Shared mobile CSS tokens set 16px form text, 44–48px touch targets, safe-area spacing, responsive headings, compact cards, and five-destination bottom navigation. No applied migration changed.
 - Automated evidence is green: 25 Vitest files / 86 tests, typecheck, lint, and development Vite build. Browser automation was unavailable, and physical Android visual/media checks remain pending.

@@ -124,6 +124,59 @@ export type GroupTopic = {
   createdAt: string
 }
 
+const INVITE_BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+function encodeInviteBase32(hex: string): string {
+  const bytes = hex.match(/[0-9A-F]{2}/g)?.map(value => Number.parseInt(value, 16)) || []
+  let buffer = 0
+  let bits = 0
+  let output = ''
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte
+    bits += 8
+    while (bits >= 5) {
+      bits -= 5
+      output += INVITE_BASE32[(buffer >> bits) & 31]
+    }
+  }
+  if (bits > 0) output += INVITE_BASE32[(buffer << (5 - bits)) & 31]
+  return output
+}
+
+function decodeInviteBase32(value: string): string | null {
+  let buffer = 0
+  let bits = 0
+  const bytes: number[] = []
+  for (const character of value) {
+    const digit = INVITE_BASE32.indexOf(character)
+    if (digit < 0) return null
+    buffer = (buffer << 5) | digit
+    bits += 5
+    if (bits >= 8) {
+      bits -= 8
+      bytes.push((buffer >> bits) & 255)
+    }
+  }
+  return bytes.map(byte => byte.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+
+export function formatGroupInviteCode(rawCode: string): string {
+  const raw = rawCode.trim().toUpperCase()
+  const payload = raw.replace(/^SS-/, '').replaceAll('-', '')
+  if (!/^[0-9A-F]+$/.test(payload) || payload.length % 2 !== 0) return raw
+  const displayPayload = encodeInviteBase32(payload)
+  return `SS-${displayPayload.match(/.{1,4}/g)?.join('-') || displayPayload}`
+}
+
+export function normalizeGroupInviteCode(input: string): string {
+  const value = input.trim().toUpperCase().replace(/\s+/g, '')
+  const payload = value.replace(/^SS-/, '').replaceAll('-', '')
+  if (/^[0-9A-F]+$/.test(payload) && payload.length % 2 === 0) return `SS-${payload}`
+  if (!/^SS-[A-Z2-7]+(?:-[A-Z2-7]+)+$/.test(value)) return value
+  const decoded = decodeInviteBase32(payload)
+  return decoded ? `SS-${decoded}` : value
+}
+
 export type GroupInvite = {
   id: string
   groupId: string

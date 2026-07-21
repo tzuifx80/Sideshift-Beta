@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient, getOrCreateAnonymousSession, readSupabaseC
 import type { AppRepository } from '../data/repository'
 import { defaultProfileFieldVisibility } from '../profile'
 import { clearSignedOutPreference, hasSignedOutPreference, logoutDiagnostic, shouldIgnoreAuthStateChange, signOutAndClear } from '../logout'
+import { authFlowErrorCode, requestEmailOtp, verifyEmailOtp, type AuthFlowClient, type AuthFlowKind } from './authFlow'
 
 export type AuthState = {
   user: User | null
@@ -18,20 +19,28 @@ export type AuthState = {
   signedOut: boolean
   retry: () => void
   continueAsGuest: () => Promise<void>
+  requestSignInOtp: (email: string) => Promise<void>
+  verifySignInOtp: (email: string, code: string) => Promise<void>
+  requestSecureAccountOtp: (email: string) => Promise<void>
+  verifySecureAccountOtp: (email: string, code: string) => Promise<void>
   resetSession: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthState>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend: 'local', repository: null, signedOut: false, retry: () => undefined, continueAsGuest: async () => undefined, resetSession: async () => undefined })
+type AuthRuntimeState = Omit<AuthState, 'retry' | 'continueAsGuest' | 'requestSignInOtp' | 'verifySignInOtp' | 'requestSecureAccountOtp' | 'verifySecureAccountOtp' | 'resetSession'>
+
+const AuthContext = createContext<AuthState>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend: 'local', repository: null, signedOut: false, retry: () => undefined, continueAsGuest: async () => undefined, requestSignInOtp: async () => undefined, verifySignInOtp: async () => undefined, requestSecureAccountOtp: async () => undefined, verifySecureAccountOtp: async () => undefined, resetSession: async () => undefined })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const backend = (import.meta.env.VITE_DATA_BACKEND || (import.meta.env.PROD ? 'supabase' : 'local')) as AuthState['backend']
-  const [state, setState] = useState<Omit<AuthState, 'retry' | 'continueAsGuest' | 'resetSession'>>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend, repository: null, signedOut: false })
+  const [state, setState] = useState<AuthRuntimeState>({ user: null, userId: null, accessToken: null, loading: true, error: null, backend, repository: null, signedOut: false })
   const [attempt, setAttempt] = useState(0)
   const signingOutRef = useRef(false)
   const allowAnonymousCreationRef = useRef(false)
+  const clientRef = useRef<SupabaseClient | null>(null)
 
   const connect = useCallback(async (signal?: { cancelled: boolean }): Promise<() => void> => {
     if (backend === 'local') {
+      clientRef.current = null
       const local = loadState()
       const repository = selectRepository({ VITE_DATA_BACKEND: 'local' })
       setState({ user: null, userId: local.userId, accessToken: null, loading: false, error: null, backend, repository, signedOut: false })
@@ -39,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
     const client = createSupabaseBrowserClient(config)
-    if (hasSignedOutPreference()) {
+    clientRef.current = client
+    if (hasSignedOutPreference() && !allowAnonymousCreationRef.current) {
       setState({ user: null, userId: null, accessToken: null, loading: false, error: null, backend, repository: null, signedOut: true })
       return () => undefined
     }
@@ -47,11 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (signal?.cancelled || shouldIgnoreAuthStateChange(signingOutRef.current, hasSignedOutPreference())) return
       setState({ user: session?.user || null, userId: session?.user.id || null, accessToken: session?.access_token || null, loading: false, error, backend, repository: session ? repository : null, signedOut: !session })
     }
+    const deliberateGuestContinuation = allowAnonymousCreationRef.current
     try {
-      const session = await getOrCreateAnonymousSession(client, { allowAnonymousCreation: allowAnonymousCreationRef.current })
+      const session = await getOrCreateAnonymousSession(client, { allowAnonymousCreation: deliberateGuestContinuation, allowSignedOutContinuation: deliberateGuestContinuation })
       if (!session) {
         setState({ user: null, userId: null, accessToken: null, loading: false, error: null, backend, repository: null, signedOut: true })
         return () => undefined
+      }
+      if (deliberateGuestContinuation) {
+        try { clearSignedOutPreference() } catch {
+          await client.auth.signOut({ scope: 'local' }).catch(() => undefined)
+          throw new Error('Guest mode could not start. Please try again.')
+        }
+        allowAnonymousCreationRef.current = false
       }
       const repository = selectRepository({ VITE_DATA_BACKEND: 'supabase', VITE_SUPABASE_URL: config.url, VITE_SUPABASE_ANON_KEY: config.anonKey }, client)
       const existingProfile = await repository.loadProfile(session.user.id)
@@ -61,8 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session, repository)
       const subscription = client.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession, repository))
       return () => subscription.data.subscription.unsubscribe()
-    } catch (caught) {
-      setSession(null, null, caught instanceof Error ? caught.message : 'Authentication failed. Try again.')
+    } catch {
+      allowAnonymousCreationRef.current = false
+      if (deliberateGuestContinuation) setSession(null, null)
+      else setSession(null, null, 'Authentication is temporarily unavailable. Please retry.')
       return () => undefined
     }
   }, [backend])
@@ -99,17 +119,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAttempt(value => value + 1)
   }, [])
   const continueAsGuest = useCallback(async () => {
-    try {
-      clearSignedOutPreference()
-    } catch {
-      setState(current => ({ ...current, loading: false, error: 'Guest mode could not start. Please try again.', signedOut: true }))
-      return
-    }
     allowAnonymousCreationRef.current = true
     signingOutRef.current = false
     setState(current => ({ ...current, user: null, userId: null, accessToken: null, loading: true, error: null, repository: null, signedOut: false }))
     setAttempt(value => value + 1)
   }, [])
+  const runEmailFlow = useCallback(async (email: string, kind: AuthFlowKind, code?: string) => {
+    const client = clientRef.current
+    if (backend !== 'supabase' || !client) throw new Error('Authentication is not available in this build.')
+    try {
+      if (code === undefined) {
+        await requestEmailOtp(client as unknown as AuthFlowClient, email, kind)
+        return
+      }
+      const session = await verifyEmailOtp(client as unknown as AuthFlowClient, email, code, kind)
+      signingOutRef.current = false
+      allowAnonymousCreationRef.current = false
+      try { clearSignedOutPreference() } catch {
+        await client.auth.signOut({ scope: 'local' }).catch(() => undefined)
+        throw new Error('Sign-in could not be completed. Please try again.')
+      }
+      setState(current => ({ ...current, loading: true, error: null, signedOut: false, user: session.user, userId: session.user.id, accessToken: session.access_token }))
+      setAttempt(value => value + 1)
+    } catch (caught) {
+      const codeValue = authFlowErrorCode(caught)
+      const error = new Error(codeValue)
+      error.name = 'AuthFlowError'
+      throw error
+    }
+  }, [backend])
+  const requestSignInOtp = useCallback((email: string) => runEmailFlow(email, 'sign-in'), [runEmailFlow])
+  const verifySignInOtp = useCallback((email: string, code: string) => runEmailFlow(email, 'sign-in', code), [runEmailFlow])
+  const requestSecureAccountOtp = useCallback((email: string) => runEmailFlow(email, 'secure-account'), [runEmailFlow])
+  const verifySecureAccountOtp = useCallback((email: string, code: string) => runEmailFlow(email, 'secure-account', code), [runEmailFlow])
   const resetSession = useCallback(async () => {
     if (backend !== 'supabase') return
     signingOutRef.current = true
@@ -132,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [backend])
 
-  const value = useMemo(() => ({ ...state, retry, continueAsGuest, resetSession }), [continueAsGuest, resetSession, retry, state])
+  const value = useMemo(() => ({ ...state, retry, continueAsGuest, requestSignInOtp, verifySignInOtp, requestSecureAccountOtp, verifySecureAccountOtp, resetSession }), [continueAsGuest, requestSecureAccountOtp, requestSignInOtp, resetSession, retry, state, verifySecureAccountOtp, verifySignInOtp])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

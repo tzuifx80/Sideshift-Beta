@@ -31,20 +31,20 @@ export function createSupabaseBrowserClient(config: SupabaseConfig): SupabaseCli
   return browserClient
 }
 
-export async function getOrCreateAnonymousSession(client: SupabaseClient, options: { storage?: Storage | null; allowAnonymousCreation?: boolean } = {}): Promise<Session | null> {
-  if (hasSignedOutPreference(options.storage)) return null
+export async function getOrCreateAnonymousSession(client: SupabaseClient, options: { storage?: Storage | null; allowAnonymousCreation?: boolean; allowSignedOutContinuation?: boolean } = {}): Promise<Session | null> {
+  if (hasSignedOutPreference(options.storage) && options.allowSignedOutContinuation !== true) return null
   const existing = await client.auth.getSession()
   if (existing.error) throw existing.error
   if (existing.data.session) return existing.data.session
 
-  if (hasSignedOutPreference(options.storage)) return null
+  if (hasSignedOutPreference(options.storage) && options.allowSignedOutContinuation !== true) return null
   if (options.allowAnonymousCreation !== true) return null
 
   if (!anonymousSessionPromise) {
     anonymousSessionPromise = client.auth.signInAnonymously().then(result => {
       if (result.error) throw result.error
       if (!result.data.session) throw new Error('Supabase did not return an anonymous session.')
-      return hasSignedOutPreference(options.storage) ? null : result.data.session
+      return hasSignedOutPreference(options.storage) && options.allowSignedOutContinuation !== true ? null : result.data.session
     }).finally(() => { anonymousSessionPromise = null })
   }
   return anonymousSessionPromise

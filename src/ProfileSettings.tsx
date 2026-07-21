@@ -9,6 +9,7 @@ import { normalizePreferences, normalizeProfile } from './profile'
 import { filterProfileForViewer, validateSocialLink, type ProfileViewerRole } from './profileVisibility'
 import { useTranslations } from './i18n'
 import { logoutDiagnostic } from './logout'
+import { EmailOtpFlow } from './auth/EmailOtpFlow'
 
 type Section = 'hub' | 'profile' | 'privacy' | 'debate' | 'appearance' | 'account' | 'help'
 
@@ -25,6 +26,8 @@ type ProfileSettingsProps = {
   onNotify: (message: string) => void
   onDelete: () => void
   onSignOut: () => Promise<void>
+  onRequestSecureAccountOtp: (email: string) => Promise<void>
+  onVerifySecureAccountOtp: (email: string, code: string) => Promise<void>
   onOpenOnboarding: () => void
   onOpenProfile: (profileKey: string) => void
   hasUnsavedDraft?: boolean
@@ -41,7 +44,7 @@ function fieldLabel(field: ProfileField, t: ReturnType<typeof useTranslations>):
   return field === 'displayName' ? t('onboarding.displayName') : field === 'profileAccent' ? t('settings.accent') : field === 'statistics' ? t('profileSettings.statistics') : field === 'socialLinks' ? t('profileSettings.socialLinks') : field === 'avatar' ? t('friends.photo') : t('settings.shortBio')
 }
 
-export function ProfileSettings({ profile, preferences, user, userId, repository, language, onSaveProfile, onSavePreferences, onBack, onNotify, onDelete, onSignOut, onOpenOnboarding, onOpenProfile, hasUnsavedDraft = false }: ProfileSettingsProps) {
+export function ProfileSettings({ profile, preferences, user, userId, repository, language, onSaveProfile, onSavePreferences, onBack, onNotify, onDelete, onSignOut, onRequestSecureAccountOtp, onVerifySecureAccountOtp, onOpenOnboarding, onOpenProfile, hasUnsavedDraft = false }: ProfileSettingsProps) {
   const t = useTranslations(language)
   const [section, setSection] = useState<Section>('hub')
   const [draft, setDraft] = useState(profile)
@@ -140,5 +143,6 @@ export function ProfileSettings({ profile, preferences, user, userId, repository
     {section === 'account' && <section className="settings-section card-surface destructive-zone"><div className="settings-section-heading"><div><span className="eyebrow">{t('profileSettings.security')}</span><h2>{security === 'anonymous' ? t('profileSettings.anonymous') : security === 'email' ? t('profileSettings.email') : t('profileSettings.oauth')}</h2></div><Icon name="shield" size={20} /></div>{security === 'anonymous' && <p className="form-warning" role="alert">{t('profileSettings.anonymousWarning')}</p>}<p className="field-help">{t('profileSettings.accountBody')}</p><div className="account-actions"><Button variant="secondary" onClick={requestSignOut} disabled={busy || signingOut}>{t('profileSettings.signOut')}</Button><Button variant="ghost" onClick={onDelete} disabled={busy || signingOut}>{t('shell.deleteData')}</Button></div></section>}
     {signOutDialogOpen && <div className="modal-scrim"><section className="modal-card card-surface logout-dialog" role="dialog" aria-modal="true" aria-labelledby="sign-out-dialog-title"><button type="button" className="modal-close" onClick={() => setSignOutDialogOpen(false)} aria-label={t('common.close')}><Icon name="close" size={18} /></button><span className="eyebrow">{t('profileSettings.account')}</span><h2 id="sign-out-dialog-title">{t('profileSettings.signOutDialogTitle')}</h2><p>{security === 'anonymous' ? t('profileSettings.signOutDialogBody') : t('profileSettings.signOut')}</p>{hasUnsavedDraft && <p className="form-warning">{t('profileSettings.activeDraftWarning')}</p>}{hasChanges && !hasUnsavedDraft && <p className="form-warning">{t('profileSettings.unsavedSignOut')}</p>}<div className="modal-actions"><Button variant="secondary" onClick={() => setSignOutDialogOpen(false)} disabled={signingOut}>{t('profileSettings.staySignedIn')}</Button><button type="button" className="button button-danger" onClick={() => void confirmSignOut()} disabled={signingOut}>{signingOut ? t('profileSettings.signingOut') : t('profileSettings.signOutAnyway')}</button></div></section></div>}
     {section === 'help' && <section className="settings-section card-surface"><Button variant="secondary" onClick={onOpenOnboarding}>{t('profileSettings.help')}</Button><p className="field-help">{t('profileSettings.helpBody')}</p><span className="muted">SideShift beta</span></section>}
+    {section === 'account' && security === 'anonymous' && <section className="settings-section card-surface account-secure-section"><EmailOtpFlow language={language} mode="secure-account" requestCode={onRequestSecureAccountOtp} verifyCode={onVerifySecureAccountOtp} onDone={() => onNotify(t('auth.accountSecured'))} /></section>}
   </div>
 }
