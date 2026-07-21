@@ -2,6 +2,15 @@
 
 Completion: `IMPLEMENTED_WITH_MANUAL_ANDROID_RETEST_PENDING`
 
+## Final mobile structure and persistent logout - 2026-07-21
+
+- Logout now persists a non-sensitive `sideshift-signed-out-v1` marker only after local Supabase sign-out succeeds. Bootstrap, auth callbacks, Capacitor resume, app restart, and private-state hydration respect it; no anonymous session is created from an empty session alone.
+- `Continue as guest` is the only deliberate anonymous-session creation path after the signed-out welcome. It clears the marker, starts one bootstrap attempt, and keeps the marker if local storage cannot be cleared.
+- App memory, local private state, draft keys, profile/avatar publication, and route state are cleared on signed-out transition. Android Back handlers return through nested screens and cannot restore the old private route after logout.
+- Mobile ownership is contract-tested: Home/Explore own World Pulse, Friends owns Friends League, Groups owns Group League, Profile/Settings own avatar editing, and Settings owns account controls. The five bottom destinations remain Home, Explore, Friends, Groups, Profile.
+- Settings uses focused sub-screens and a single localized sign-out dialog with retryable failure handling. Mobile CSS standardizes 16px form text, 44-48px controls, safe-area navigation, modal bottom sheets, destructive separation, and compact card hierarchy.
+- Automated verification is green for 33 Vitest files / 114 tests, typecheck, lint, env, providers, encoding, PWA, secret scan, dependency audit, HTTPS-placeholder build, Capacitor sync, and Android debug APK compilation. Physical Android restart/logout/Back and visual viewport checks remain pending because `adb` and browser screenshot automation are unavailable.
+
 ## World Pulse and Private Debate League — 2026-07-20
 
 - World Pulse uses reviewed, sourced items with translations, sensitivity, publication windows, source metadata, and immutable debate snapshots.

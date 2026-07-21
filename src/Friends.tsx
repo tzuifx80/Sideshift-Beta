@@ -25,9 +25,9 @@ function ProfilePreviewCard({ repository, userId, profile, fallback, children, o
   return <div className="friend-preview"><button type="button" className="profile-preview-link" onClick={() => navigate?.(profile.profileKey)}><Avatar repository={repository} userId={userId} profile={profile} /><span><strong>{displayName(profile) || fallback}</strong>{profile.handle && <small>@{profile.handle}</small>}{profile.bio && <p>{profile.bio}</p>}</span></button><div className="friend-actions">{children}</div></div>
 }
 
-type FriendsProps = { userId: string; language: Language; repository: AppRepository; profile: UserProfile; onProfile: (profile: UserProfile, forceAvatarRevision?: boolean) => void; onOpenProfile?: (profileKey: string) => void; online: boolean; onNotify: (message: string) => void }
+type FriendsProps = { userId: string; language: Language; repository: AppRepository; profile: UserProfile; onProfile: (profile: UserProfile, forceAvatarRevision?: boolean) => void; onOpenProfile?: (profileKey: string) => void; onBack?: () => void; online: boolean; onNotify: (message: string) => void }
 
-function FriendsBase({ userId, language, repository, profile, onProfile, onOpenProfile, online, onNotify }: FriendsProps) {
+function FriendsBase({ userId, language, repository, profile, onProfile, onOpenProfile, onBack, online, onNotify }: FriendsProps) {
   const t = useTranslations(language)
   const [friendships, setFriendships] = useState<FriendshipRecord[]>([])
   const [blocks, setBlocks] = useState<ProfilePreview[]>([])
@@ -48,6 +48,15 @@ function FriendsBase({ userId, language, repository, profile, onProfile, onOpenP
   const [answer, setAnswer] = useState('')
   const [groupTarget, setGroupTarget] = useState<ProfilePreview | null>(null)
   const [groupId, setGroupId] = useState('')
+  useEffect(() => {
+    function handleNativeBack(event: Event) {
+      event.preventDefault()
+      if (viewingProfileKey) setViewingProfileKey(null)
+      else onBack?.()
+    }
+    window.addEventListener('sideshift-native-back', handleNativeBack)
+    return () => window.removeEventListener('sideshift-native-back', handleNativeBack)
+  }, [onBack, viewingProfileKey])
   const openProfile = (profileKey: string) => {
     const nextKey = humanProfileKey({ kind: 'human', profileKey })
     if (!nextKey) return

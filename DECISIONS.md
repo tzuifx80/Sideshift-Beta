@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-07-21 Persistent signed-out state and final mobile IA
+
+- A missing Supabase session is an explicit signed-out state; anonymous bootstrap is opt-in and can run only after the user selects Continue as guest. Existing sessions are still reused.
+- Deliberate local sign-out writes `sideshift-signed-out-v1` after `auth.signOut({ scope: 'local' })` and before private cleanup completes. The marker contains no secret or personal data and is cleared only by deliberate guest continuation; secure account linking remains out of scope.
+- Auth callbacks are ignored while signing out or while the marker is present. Capacitor lifecycle events force the signed-out state, and App clears private React state so a late callback, resume, restart, or Back action cannot restore the previous account.
+- The mobile IA keeps exactly five top-level destinations. World Pulse is Home/Explore content, Friends League is Friends content, Group League is Groups content, and account/avatar controls are Profile/Settings content.
+- Settings is the configuration hub; Profile remains the identity/presentation surface. Sign Out and Delete Account are separated in Account & Data and use one deliberate modal flow.
+
 ## 2026-07-20 World Pulse and Private Debate League
 
 - World Pulse is curated and server-published: normal users read only active published payloads, while draft/review/publish actions use editor roles and security-definer RPCs.

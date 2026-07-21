@@ -787,3 +787,55 @@ html.reduced-motion *, html.reduced-motion *::before, html.reduced-motion *::aft
   .world-pulse-filters { align-items: stretch; }
   .compact-select { width: 100%; }
 }
+
+/* Final mobile contract: one clear action, readable controls, and safe-area ownership. */
+input, textarea, select { font-size: 16px; }
+.button { min-height: 44px; }
+.text-link, .back-link, .modal-close { min-height: 44px; }
+.topbar .icon-button { display: none; }
+.personal-home .home-heading .button-dark,
+.personal-home .world-card .button-dark,
+.personal-home .home-pulse-retention .button-dark { color: var(--ink); background: transparent; border: 1px solid var(--line); }
+.personal-home .home-heading .button-dark:hover,
+.personal-home .world-card .button-dark:hover,
+.personal-home .home-pulse-retention .button-dark:hover { background: var(--surface-subtle); }
+.signed-out-panel { width: min(480px, 100%); margin: clamp(44px, 12vh, 120px) auto 0; padding: 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.signed-out-panel h1 { margin-top: 14px; font-size: clamp(36px, 8vw, 56px); line-height: .98; }
+.signed-out-panel .stage-intro { margin-top: 14px; color: var(--ink-muted); line-height: 1.55; }
+.signed-out-actions { display: grid; gap: 10px; margin-top: 24px; }
+.signed-out-learn { justify-self: center; margin-top: 2px; }
+.modal-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.logout-dialog { border-top: 4px solid var(--danger); }
+.logout-dialog .button-danger { color: #fff; background: var(--danger); }
+.logout-dialog .button-danger:hover { background: #96342f; }
+.destructive-zone { border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); background: color-mix(in srgb, var(--danger) 4%, var(--surface)); }
+.profile-heading-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.profile-social-list { margin-top: 16px; }
+.profile-identity-addendum { display: flex; align-items: center; justify-content: space-between; gap: 18px; max-width: 900px; margin-top: 24px; padding: 16px 0 0; border-top: 1px solid var(--line); }
+.profile-identity-addendum .profile-handle { margin: 7px 0 0; color: var(--ink-muted); }
+.profile-identity-addendum .profile-social-list { margin-top: 12px; }
+.personal-profile .profile-footer .back-link { display: none; }
+
+@media (max-width: 900px) {
+  .main-content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .mobile-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+  .mobile-nav button { min-height: 44px; }
+}
+
+@media (max-width: 680px) {
+  .topbar { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .main-content { padding-left: 16px; padding-right: 16px; }
+  .page-heading { margin-bottom: 24px; }
+  .page-heading h1 { max-width: 100%; overflow-wrap: anywhere; }
+  .heading-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .heading-actions .button { width: 100%; margin-left: 0; }
+  .signed-out-panel { margin-top: 48px; padding: 22px 18px; }
+  .modal-scrim { align-items: end; padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .modal-card { max-height: calc(100dvh - 24px); overflow-y: auto; padding: 22px 18px; border-radius: 18px 18px 12px 12px; }
+  .modal-actions { display: grid; grid-template-columns: 1fr; }
+  .modal-actions > * { width: 100%; }
+  .profile-heading-actions { width: 100%; align-items: stretch; }
+  .profile-heading-actions .button { width: 100%; }
+  .profile-identity-addendum { align-items: stretch; flex-direction: column; }
+  .profile-identity-addendum .button { width: 100%; }
+}

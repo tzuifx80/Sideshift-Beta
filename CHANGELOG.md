@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Finalized mobile information architecture and shared shell contracts: five bottom destinations, focused Profile/Settings ownership, Home/Explore World Pulse placement, Friends/Groups League placement, safe-area spacing, touch-target sizing, and destructive-action separation.
+- Added a durable signed-out preference and explicit guest continuation. Empty-session bootstrap no longer creates anonymous users automatically; late auth callbacks, Capacitor resume, restart, private-state hydration, and Android Back stay signed out after deliberate logout.
+- Added a localized mobile logout dialog with anonymous-account warning, active-draft warning, progress state, retryable failure behavior, and separate Delete Account placement.
+- Added regression contracts for the physical logout restart failure, deliberate guest creation, bootstrap races, five-destination ownership, World Pulse/League placement, and private-state cleanup.
+
 - Added World Pulse with reviewed statuses, HTTPS source metadata, translations, sensitivity preferences, freshness windows, debate snapshots, Explore integration, and a server-authorized internal review boundary.
 - Added private opt-in Friends and Group Debate Leagues with recurring UTC seasons, server-authoritative idempotent scoring, anti-farming caps, private breakdowns, evidence-backed awards, and request-time season finalization.
 - Added migrations `0028`–`0032`; migrations `0001`–`0027` remain untouched. Added focused domain tests and the linked World Pulse/League verifier.

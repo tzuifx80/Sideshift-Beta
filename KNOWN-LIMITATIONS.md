@@ -1,5 +1,7 @@
 # Known limitations
 
+- The persistent signed-out lifecycle is covered by deterministic regression tests and an Android debug APK build, but it has not been exercised on the confirmed physical phone. Retest logout, relaunch, resume, Back, and Continue as guest on-device before using `MOBILE_STRUCTURE_AND_LOGOUT_VERIFIED`.
+
 - World Pulse editorial creation/editing is intentionally a minimal internal workspace; source and translation form editing is available through the server RPC boundary but not yet exposed as a full newsroom form.
 - The initial World Pulse content is deterministic demonstration material, not a live-news feed. No automatic breaking-news ingestion or AI publication is enabled.
 - Group League and completed-season award behavior are covered by schema/RPC compilation and domain tests; full multi-user remote Group privacy and season-expiry exercise remains a manual follow-up because anonymous-auth rate limits limit additional stable test-user creation.

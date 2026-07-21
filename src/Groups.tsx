@@ -89,6 +89,16 @@ export function Groups({ userId, language, repository, onStartTeam, onBack, onNo
       }
     })()
   }, [initialGroupId, repository, userId])
+  useEffect(() => {
+    function handleNativeBack(event: Event) {
+      event.preventDefault()
+      if (viewingProfileKey) setViewingProfileKey(null)
+      else if (selected) { setGroupPath(); setSelected(null) }
+      else onBack()
+    }
+    window.addEventListener('sideshift-native-back', handleNativeBack)
+    return () => window.removeEventListener('sideshift-native-back', handleNativeBack)
+  }, [onBack, selected, viewingProfileKey])
   async function create(input: CreateGroupInput) { const created = await repository.createGroup(userId, input); await reload(); const next = await repository.loadGroup(userId, created.id); setSelected(next); setGroupPath(next.id); setShowCreate(false); onNotify(t('groups.createPrivate')) }
   async function join() { if (!inviteCode.trim()) return; try { const joined = await repository.joinGroupByInvite(userId, inviteCode); await reload(); const next = await repository.loadGroup(userId, joined.id); setSelected(next); setGroupPath(next.id); setInviteCode(''); onNotify(t('common.join')) } catch (caught) { setError(caught instanceof Error ? caught.message : t('groups.inviteHelp')) } }
   if (viewingProfileKey) return <ProfileViewScreen userId={userId} profileKey={viewingProfileKey} language={language} repository={repository} onBack={() => setViewingProfileKey(null)} />

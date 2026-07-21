@@ -312,11 +312,16 @@ function PersonalExplore(props: { language: Language; interests: string[]; recen
   return <><WorldPulsePanel language={props.language} items={items} loading={loading} error={error} hideSensitiveDefault={hideSensitive} onHideSensitiveChange={value => { void persistSensitive(value) }} onChooseDebate={take => props.onChooseDebate(take)} /><PersonalExploreBase {...props} /></>
 }
 
-function PersonalProfile({ profile, language, stats, history, onSettings, onBack }: { profile: UserProfile; language: Language; stats: PersonalStats; history: ResultData[]; onSettings: () => void; onBack: () => void }) {
+function PersonalProfileBase({ profile, language, stats, history, onSettings, onBack }: { profile: UserProfile; language: Language; stats: PersonalStats; history: ResultData[]; onSettings: () => void; onBack: () => void }) {
   const t = useTranslations(language)
   const name = profile.displayName || 'Curious challenger'
   const firstScore = history[0]?.scores[0]?.score || 0
   return <div className="page profile-page personal-profile"><div className="page-heading"><div><span className="eyebrow">{t('profile.eyebrow')}</span><h1>{name}<span className="heading-period">.</span></h1><p className="muted">{profile.bio || t('profile.privateBody')}</p></div><Button variant="secondary" icon="settings" onClick={onSettings}>{t('common.editProfile')}</Button></div><div className="profile-overview"><section className="profile-hero card-surface"><div className={`profile-avatar-large avatar-${profile.avatarPreset}`}>{avatarGlyph(profile.avatarPreset)}<span className="online-dot" /></div><h2>{t('profile.keepQuestions')}</h2><p>{t('profile.privateBody')}</p><div className="profile-tags"><Tag tone="coral">{t('common.private')}</Tag><Tag tone="lavender">{stats.currentStreak} {t('profile.currentStreak')}</Tag><Tag tone="yellow">{stats.debatesCompleted} {t('home.debatesCompleted')}</Tag></div></section><section className="profile-stats card-surface"><span className="eyebrow">{t('profile.debateDna')}</span><div className="dna-chart"><div className="dna-ring"><strong>{stats.averageScore || '—'}</strong><small>{t('profile.averageScore')}</small></div><div className="dna-legend"><span><i className="legend-coral" /> {t('profile.strongest')} <b>{stats.strongestDimension}</b></span><span><i className="legend-lavender" /> {t('profile.currentStreak')} <b>{stats.currentStreak}</b></span><span><i className="legend-yellow" /> {t('profile.categories')} <b>{stats.categoriesExplored}</b></span><span><i className="legend-blue" /> {t('profile.latestSignal')} <b>{firstScore || '—'}</b></span></div></div><p className="ai-disclaimer"><Icon name="info" size={14} /> {t('profile.aiDisclaimer')}</p></section></div><section className="profile-metric-grid"><div className="metric-card"><strong>{stats.bestStreak}</strong><span>{t('profile.bestStreak')}</span></div><div className="metric-card"><strong>{stats.sideSwitchCompleted}</strong><span>{t('profile.sideSwitch')}</span></div><div className="metric-card"><strong>{stats.classicCompleted}</strong><span>{t('profile.classic')}</span></div><div className="metric-card"><strong>{stats.challengeResponses}</strong><span>{t('profile.challengeResponses')}</span></div><div className="metric-card"><strong>{stats.challengeCreated}</strong><span>{t('profile.challengesCreated')}</span></div></section><section className="section-block profile-history"><div className="section-heading"><div><span className="eyebrow">{t('profile.history')}</span><h2>{t('home.recentShifts')}</h2></div><span className="muted">{stats.totalActiveDays} {t('profile.activeDays')}</span></div>{history.length ? <div className="recent-grid">{history.slice(0, 5).map(result => <RecentShift key={result.id} result={result} language={language} />)}</div> : <div className="empty-state card-surface"><strong>{t('profile.noDebates')}</strong><span>{t('profile.firstResult')}</span></div>}</section><div className="profile-footer"><button type="button" className="back-link" onClick={onBack}><Icon name="arrow" size={15} /> {t('common.back')}</button><span><Icon name="lock" size={13} /> {t('profile.privateDefault')}</span></div></div>
+}
+
+function PersonalProfile(props: Parameters<typeof PersonalProfileBase>[0]) {
+  const t = useTranslations(props.language)
+  return <><PersonalProfileBase {...props} /><section className="profile-identity-addendum"><div><span className="eyebrow">{t('profile.eyebrow')}</span>{props.profile.handle && <p className="profile-handle">@{props.profile.handle}</p>}{props.profile.socialLinks.length > 0 && <div className="profile-social-list">{props.profile.socialLinks.map(link => <a href={link.url} target="_blank" rel="noopener noreferrer" key={`${link.provider}-${link.url}`}>{link.label || link.provider}<Icon name="link" size={13} /></a>)}</div>}</div><Button variant="secondary" icon="settings" onClick={props.onSettings}>{t('common.settings')}</Button></section></>
 }
 
 function AiDefaultsSection({ language, preferences, onChange }: { language: Language; preferences: UserPreferences; onChange: (patch: Partial<UserPreferences>) => void }) {
@@ -399,9 +404,9 @@ function BackendGate({ title, message, action }: { title: string; message: strin
   return <div className="onboarding-page"><div className="created-challenge"><Tag tone="coral">PRIVATE BETA</Tag><h1>{title}</h1><p className="stage-intro" role="alert">{message}</p>{action && <Button onClick={action.onClick}>{action.label}</Button>}</div></div>
 }
 
-function SignedOutWelcome({ language, onStart }: { language: Language; onStart: () => void }) {
+function SignedOutWelcomeV2({ language, onStart, onNotify }: { language: Language; onStart: () => void | Promise<void>; onNotify: (message: string) => void }) {
   const t = useTranslations(language)
-  return <div className="onboarding-page"><div className="onboarding-top"><Logo /><span className="onboarding-meta"><Icon name="lock" size={14} /> {t('common.privateByDefault')}</span></div><div className="created-challenge"><Tag tone="coral">{t('profileSettings.signedOut')}</Tag><h1>{t('profileSettings.signedOut')}</h1><p className="stage-intro">{t('profileSettings.signedOutBody')}</p><Button onClick={onStart}>{t('profileSettings.startNewSession')}</Button></div></div>
+  return <div className="onboarding-page signed-out-page"><div className="onboarding-top"><Logo /><span className="onboarding-meta"><Icon name="lock" size={14} /> {t('common.privateByDefault')}</span></div><main className="signed-out-panel"><Tag tone="coral">{t('profileSettings.signedOut')}</Tag><h1>{t('profileSettings.signedOut')}</h1><p className="stage-intro">{t('profileSettings.signedOutBody')}</p><div className="signed-out-actions"><Button className="full-width" icon="arrow" onClick={() => { void onStart() }}>{t('profileSettings.continueAsGuest')}</Button><Button className="full-width" variant="secondary" onClick={() => onNotify(t('profileSettings.secureAccountUnavailable'))}>{t('profileSettings.secureAccount')}</Button><button type="button" className="text-link signed-out-learn" onClick={() => onNotify(t('profileSettings.learnBody'))}>{t('profileSettings.learn')}</button></div></main></div>
 }
 
 function App() {
@@ -473,13 +478,47 @@ function App() {
   function notify(message: string) { setToast(message) }
   useEffect(() => { registerServiceWorker(); void initializeCapacitorBridge() }, [])
   useEffect(() => {
+    if (!auth.signedOut) return
+    setHydratedUserId(null)
+    setDataError(null)
+    setHasOnboarded(false)
+    setScreen('home')
+    setProfileViewKey(null)
+    setUserName('')
+    setInterests([])
+    setProfileData(defaultProfile(''))
+    setPreferencesData(defaultPreferences(''))
+    setStatsSnapshot(emptyStatsSnapshot)
+    setActiveTake(takes[0])
+    setActiveMode('sideswitch')
+    setDebateId('')
+    setDebateStep(0)
+    setResponses({})
+    setOpponentMessages({})
+    setLastResult(null)
+    setHistory([])
+    setAiTake(takes[0])
+    setAiConfig(null)
+    setAiSnapshot(null)
+    setTeamSession(null)
+    setActiveGroupId(null)
+    setTeamInitialTopic(undefined)
+    setShowGuide(false)
+    setShowOnboarding(false)
+    setToast('')
+    debateSaveQueueRef.current = Promise.resolve()
+    latestQueuedDebateRef.current = null
+    aiCompletionRef.current.clear()
+    teamCompletionRef.current.clear()
+  }, [auth.signedOut])
+  useEffect(() => {
     const handleNativeBack = (event: Event) => {
       if (event.defaultPrevented) return
-      setScreen(current => current === 'aiDebate' || current === 'debate' || current === 'team' || current === 'groups' ? 'home' : current === 'aiSetup' || current === 'debateChoice' || current === 'clash' ? 'home' : current)
+      setScreen(current => current === 'settings' || current === 'friends' || current === 'groups' ? current : current === 'profileView' ? profileViewReturn : current === 'aiDebate' || current === 'debate' || current === 'team' ? 'home' : current === 'aiSetup' || current === 'debateChoice' || current === 'clash' ? 'home' : current)
     }
     window.addEventListener('sideshift-native-back', handleNativeBack)
     return () => window.removeEventListener('sideshift-native-back', handleNativeBack)
-  }, [])
+  }, [profileViewReturn])
   useEffect(() => { setAnalyticsAccessToken(auth.accessToken) }, [auth.accessToken])
   useEffect(() => { if (dataError) trackEvent('recoverable_error_encountered', { surface: 'private_data' }) }, [dataError])
   useEffect(() => {
@@ -490,7 +529,7 @@ function App() {
   useEffect(() => { if (!hasOnboarded && repository) trackEvent('onboarding_started') }, [hasOnboarded, repository])
   useEffect(() => { if (toast) { const timeout = window.setTimeout(() => setToast(''), 3200); return () => window.clearTimeout(timeout) } }, [toast])
   useEffect(() => { applyTheme(preferencesData) }, [preferencesData])
-  useEffect(() => { publishProfileAvatar(repository && userId ? { profile: profileData, repository, userId, revision: profileData.avatarRevision || 0 } : null) }, [profileData, repository, userId])
+  useEffect(() => { publishProfileAvatar(!auth.signedOut && repository && userId ? { profile: profileData, repository, userId, revision: profileData.avatarRevision || 0 } : null) }, [auth.signedOut, profileData, repository, userId])
   useEffect(() => {
     const handleDebateEntry = () => beginDebateEntry(activeTake)
     window.addEventListener('sideshift-debate-entry', handleDebateEntry)
@@ -849,7 +888,7 @@ function App() {
   if (legalPath === '/privacy') return <LegalPage kind="privacy" />
   if (legalPath === '/terms') return <LegalPage kind="terms" />
   if (legalPath === '/community') return <LegalPage kind="community" />
-  if (auth.signedOut) return <SignedOutWelcome language={language} onStart={auth.retry} />
+  if (auth.signedOut) return <SignedOutWelcomeV2 language={language} onStart={auth.continueAsGuest} onNotify={notify} />
   if (!repository || !userId) return <BackendGate title="Backend unavailable" message="SideShift could not establish an authenticated data path." action={{ label: 'Retry connection', onClick: auth.retry }} />
   if (legalPath === '/internal/world-pulse') return <Suspense fallback={<FeatureLoading language={language} />}><WorldPulseAdmin repository={repository} userId={userId} language={language} /></Suspense>
   if (challengeToken) return <Suspense fallback={<FeatureLoading language={language} />}><FriendClashRecipient token={challengeToken} repository={repository} userId={userId} language={language} online={online} /></Suspense>
@@ -867,7 +906,7 @@ function App() {
   const settingsChildren = <ProfileSettings profile={profileData} preferences={preferencesData} user={auth.user} userId={userId} repository={repository} language={language} onSaveProfile={saveProfileSettings} onSavePreferences={savePreferenceSettings} onBack={() => setScreen('profile')} onNotify={notify} onDelete={() => void deleteBetaData()} onSignOut={auth.resetSession} onOpenOnboarding={() => setShowOnboarding(true)} onOpenProfile={key => { setProfileViewKey(key); setProfileViewReturn('settings'); setScreen('profileView') }} hasUnsavedDraft={hasUnsavedDraft} />
 // Active tree: App -> AppShellV2 -> screen-specific children.
   const children = <Suspense fallback={<FeatureLoading language={language} />}>
-    {screen === 'friends' ? <Friends userId={userId} language={language} repository={repository} profile={profileData} onProfile={setProfileData} online={online} onNotify={notify} /> : screen === 'groups' ? <Groups userId={userId} language={language} repository={repository} initialGroupId={groupPathId} onStartTeam={openTeamDebate} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'team' ? <TeamDebate userId={userId} language={language} initialTake={activeTake} initialTopic={teamInitialTopic} groupId={activeGroupId} session={teamSession} onStart={startTeamSession} onSave={saveTeamSession} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'profileView' && profileViewKey ? <ProfileViewScreen userId={userId} profileKey={profileViewKey} language={language} repository={repository} onBack={() => setScreen(profileViewReturn)} /> : screen === 'settings' ? settingsChildren : screen === 'debateChoice' ? <ClassicDebateSetup take={activeTake} language={language} onBack={() => setScreen('home')} onAi={() => beginAiSetup(activeTake)} onPerson={() => setScreen('clash')} onTeam={() => openTeamDebate()} /> : screen === 'debate' ? <ClassicDebateSession activeTake={activeTake} language={language} mode={activeMode} step={debateStep} setStep={setDebateStep} stance={stance} setStance={setStance} confidence={confidence} setConfidence={setConfidence} postStance={postStance} setPostStance={setPostStance} understanding={understanding} setUnderstanding={setUnderstanding} responses={responses} setResponses={setResponses} opponentMessages={opponentMessages} setOpponentMessages={setOpponentMessages} onModeChange={setActiveMode} onComplete={completeDebate} onExit={() => setScreen('home')} onNotify={notify} onReport={submitReport} onPersistRound={persistDebateRound} aiMode={aiMode} online={online} /> : screen === 'results' && lastResult ? <><ClassicDebateResult result={lastResult} language={language} onBegin={beginDebate} onClash={() => setScreen('clash')} onNotify={notify} /><BetaFeedbackForm language={language} surface="debate_result" screen="results" onSubmit={submitBetaFeedback} /></> : screen === 'clash' ? <FriendClashSetup userId={userId} language={language} repository={repository} initialTake={activeTake} onBack={() => setScreen('home')} onBegin={beginDebate} onNotify={notify} online={online} /> : legacyChildren}
+    {screen === 'friends' ? <Friends userId={userId} language={language} repository={repository} profile={profileData} onProfile={setProfileData} onBack={() => setScreen('home')} online={online} onNotify={notify} /> : screen === 'groups' ? <Groups userId={userId} language={language} repository={repository} initialGroupId={groupPathId} onStartTeam={openTeamDebate} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'team' ? <TeamDebate userId={userId} language={language} initialTake={activeTake} initialTopic={teamInitialTopic} groupId={activeGroupId} session={teamSession} onStart={startTeamSession} onSave={saveTeamSession} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'profileView' && profileViewKey ? <ProfileViewScreen userId={userId} profileKey={profileViewKey} language={language} repository={repository} onBack={() => setScreen(profileViewReturn)} /> : screen === 'settings' ? settingsChildren : screen === 'debateChoice' ? <ClassicDebateSetup take={activeTake} language={language} onBack={() => setScreen('home')} onAi={() => beginAiSetup(activeTake)} onPerson={() => setScreen('clash')} onTeam={() => openTeamDebate()} /> : screen === 'debate' ? <ClassicDebateSession activeTake={activeTake} language={language} mode={activeMode} step={debateStep} setStep={setDebateStep} stance={stance} setStance={setStance} confidence={confidence} setConfidence={setConfidence} postStance={postStance} setPostStance={setPostStance} understanding={understanding} setUnderstanding={setUnderstanding} responses={responses} setResponses={setResponses} opponentMessages={opponentMessages} setOpponentMessages={setOpponentMessages} onModeChange={setActiveMode} onComplete={completeDebate} onExit={() => setScreen('home')} onNotify={notify} onReport={submitReport} onPersistRound={persistDebateRound} aiMode={aiMode} online={online} /> : screen === 'results' && lastResult ? <><ClassicDebateResult result={lastResult} language={language} onBegin={beginDebate} onClash={() => setScreen('clash')} onNotify={notify} /><BetaFeedbackForm language={language} surface="debate_result" screen="results" onSubmit={submitBetaFeedback} /></> : screen === 'clash' ? <FriendClashSetup userId={userId} language={language} repository={repository} initialTake={activeTake} onBack={() => setScreen('home')} onBegin={beginDebate} onNotify={notify} online={online} /> : legacyChildren}
   </Suspense>
   function cycleLanguage() {
     const index = supportedLanguages.indexOf(language)

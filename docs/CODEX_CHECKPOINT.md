@@ -1,5 +1,16 @@
 # Codex Checkpoint
 
+## Final mobile structure and persistent logout checkpoint - 2026-07-21
+
+- Root cause confirmed: logout previously changed only React memory. After Android WebView restart, no durable signed-out marker existed, so `getOrCreateAnonymousSession` saw no session and immediately created a replacement anonymous account.
+- Fixed with `sideshift-signed-out-v1`, opt-in anonymous bootstrap, late-callback/lifecycle guards, full in-memory/private-state cleanup, and explicit Continue as guest. The marker is cleared only after deliberate guest continuation.
+- Settings logout is now one deliberate confirmation flow. Home, Explore, Friends, Groups, Profile, and Settings ownership is contract-tested; navigation remains five destinations with Friends/Groups nested back handling.
+- Verification: 33 Vitest files / 114 tests, typecheck, lint, env, provider, encoding, PWA, secret, dependency, HTTPS-placeholder build, Capacitor sync, and Gradle debug APK passed. Browser runtime and `adb` are unavailable.
+
+### Exact next action
+
+Install `android/app/build/outputs/apk/debug/app-debug.apk` on the confirmed physical Android device and run the signed-out welcome, logout/restart/resume, Continue as guest, Android Back, keyboard, dark mode, Large Text, German, and 320-412px matrix.
+
 ## World Pulse and Private Debate League checkpoint — 2026-07-20
 
 - Local and remote migrations match through `0032`; migrations `0001`–`0027` remain immutable and the phase began with `0028`.
