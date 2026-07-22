@@ -1,0 +1,18 @@
+## OpenAI Build Week — Codex + GPT-5.6
+
+SideShift was significantly extended during OpenAI Build Week using OpenAI Codex powered by GPT-5.6.
+
+Codex and GPT-5.6 helped me:
+
+- navigate and understand the full React and TypeScript codebase;
+- implement structured multi-turn AI debates;
+- build Supabase authentication, Row Level Security, and secure database flows;
+- diagnose Android, Capacitor, WebView, API-routing, and logout issues;
+- create Friends, Groups, Team Debate, World Pulse, and private leagues;
+- improve multilingual support across English, German, French, Spanish, and Italian;
+- add and verify 125 automated tests;
+- build and test the Android APK.
+
+I remained responsible for the SideSwitch concept, product direction, privacy model, visual design, feature decisions, safety constraints, and final acceptance of each implementation.
+
+The repository’s commit history documents the Build Week development work.
