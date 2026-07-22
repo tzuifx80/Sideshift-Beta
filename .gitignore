@@ -34,3 +34,5 @@ uploads/
 supabase/.temp/
 .codex-*.log
 .codex-*.err
+
+motion-exports/
