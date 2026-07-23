@@ -1,0 +1,23 @@
+---
+description: SideShift module boundaries and repository abstractions. Request when work spans UI, data, Worker, auth, or mobile.
+globs: []
+alwaysApply: false
+---
+
+Sources of truth: application code and tests. Deeper context in `docs/CODEX_CHECKPOINT.md`.
+
+## Boundaries
+
+- **Repository**: `src/data/repository.ts` interface; `selectRepository.ts` chooses local vs Supabase via `VITE_DATA_BACKEND`. Production must use Supabase.
+- **API client**: `src/data/apiConfig.ts` and `src/data/api.ts` — environment-aware Worker/Node routing.
+- **Auth**: `src/auth/` — OTP, anonymous bootstrap, session lifecycle.
+- **AI**: `src/lib/ai/` — providers, quotas, turn state; hosted path via Worker.
+- **Worker**: `worker/src/index.ts` — server-authoritative Basic AI, CORS, bearer validation.
+- **Mobile**: `src/mobileArchitecture.ts`, `src/capacitor.ts`, `capacitor.config.ts`.
+
+## Requirements
+
+- Follow existing repository and provider abstractions; do not bypass them from UI.
+- Keep domain logic out of visual components; avoid duplicate global state.
+- Plan before work touching three or more subsystems or unrelated feature areas.
+- Do not duplicate business logic across local, Supabase, and Worker layers.

@@ -1,0 +1,14 @@
+---
+description: Universal safety, scope, and verification for every task
+globs: []
+alwaysApply: true
+---
+
+- Inspect relevant code before editing; state assumptions before relying on them.
+- Stay within requested scope; prefer the smallest complete solution.
+- Preserve established architecture and naming unless change is justified.
+- Do not invent APIs, files, results, or requirements.
+- Do not fake success, placeholders, or unverified verification.
+- Never expose, commit, or log secrets or service-role credentials.
+- Ask before destructive, remote, dependency, or migration operations.
+- Inspect the final diff; run relevant validation; report failures honestly.

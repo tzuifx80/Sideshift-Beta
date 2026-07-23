@@ -1,0 +1,14 @@
+---
+description: Capacitor Android, native adapters, and mobile build requirements
+globs: ["android/**/*", "capacitor.config.ts", "src/capacitor.ts", "src/mobileArchitecture.ts", "src/mobileArchitecture.test.ts"]
+alwaysApply: false
+---
+
+- Production APK requires real `VITE_API_BASE_URL` (public HTTPS Worker); no placeholder URLs.
+- Android cannot use WebView-relative `/api`; see `src/data/apiConfig.ts` validation.
+- Respect safe areas, Android Back (nested Friends/Groups), and lifecycle persistence.
+- External links via Capacitor Browser; preserve offline and reconnect behaviour.
+- Logout and guest flows must survive WebView restart (`src/logout.ts`, signed-out marker).
+- Build path: `npm run android:build` or `npm run android:build:verify`.
+- APK output: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Physical-device checks are separate from emulator and browser verification.

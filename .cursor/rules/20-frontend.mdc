@@ -1,0 +1,15 @@
+---
+description: React, TypeScript, CSS, localization, and UI state requirements
+globs: ["src/**/*.{ts,tsx,css}", "index.html", "public/**/*"]
+alwaysApply: false
+---
+
+- Reuse `src/components/SideShiftUI.tsx`, `src/theme.ts`, and `src/ui/mobileDesign.ts` tokens.
+- User-facing text via `src/i18n/`; update every supported locale (`en`, `de`, `fr`, `es`, `it`).
+- Preserve interpolation variables, pluralisation, and fallback behaviour.
+- Handle loading, empty, offline, unavailable, reconnecting, and error states.
+- Support ~320px through desktop; check longer German strings.
+- Accessible names, keyboard operation, visible focus, reduced-motion respect.
+- Keep AI mock/live labels honest; never present simulation as a real human.
+- Preserve drafts, debate state, and refresh recovery.
+- No unrelated whole-page redesigns during focused feature work.

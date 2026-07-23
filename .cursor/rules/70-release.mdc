@@ -1,0 +1,31 @@
+---
+description: Private-beta release gate and verification checklist. Request before release or beta handoff.
+globs: []
+alwaysApply: false
+---
+
+Reference: `docs/RELEASE_CHECKLIST.md`, `docs/exec-plans/v0.2-private-beta.md`.
+
+## Automated gate
+
+- Clean git status for intended release files.
+- `npm run validate:env` (when env available).
+- `npm run typecheck`, `npm run lint`, `npm test`.
+- `npm run api:worker:test`; `npm run api:worker:verify` when Worker URL configured.
+- `npm run audit:frontend-secrets`, `npm run audit:deps`.
+- `npm run build` with real production env (HTTPS `VITE_API_BASE_URL`, no mock AI).
+- `npm run android:build:verify` for APK.
+
+## Manual gate
+
+- OTP auth on production Supabase configuration.
+- Full authenticated Basic debate with evaluation and quota behaviour.
+- Network/provider failure recovery; close/reopen persistence.
+- Feedback submission path.
+- Physical Android: Back, safe areas, logout/restart, German/long-text layouts.
+
+## Blockers
+
+- Placeholder API URLs in production builds.
+- Uncommitted secrets, `.env` files, or generated `dist/` / APK artifacts in release commits.
+- Undocumented known limitations.

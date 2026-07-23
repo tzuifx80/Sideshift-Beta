@@ -1,0 +1,16 @@
+---
+description: Cloudflare Worker API, auth, quotas, and server-side AI boundaries
+globs: ["worker/**/*", "src/data/api.ts", "src/data/apiConfig.ts", "src/lib/ai/basicProvider.ts", "server.mjs"]
+alwaysApply: false
+---
+
+Reference: `worker/README.md`, `worker/src/index.ts`, `scripts/verify-worker.mjs`.
+
+- Validate Supabase bearer token at every protected route; never trust client-supplied user IDs.
+- Service-role key stays server-side only (`worker/.dev.vars`, Wrangler secrets).
+- Enforce scoped CORS via `ALLOWED_ORIGINS`; reject unknown origins in production.
+- Bound input/output (Zod schemas); enforce quota through existing Supabase RPCs.
+- Support idempotent retries for turn and evaluation actions where implemented.
+- Return safe error categories; do not leak secrets, stack traces, or internal paths.
+- Handle provider failures honestly; no fabricated AI responses.
+- Local dev: `npm run api:worker:dev`; tests: `npm run api:worker:test`; deploy verify: `npm run api:worker:verify`.

@@ -1,0 +1,14 @@
+---
+description: Supabase migrations, repositories, RLS, and RPC requirements
+globs: ["supabase/**/*", "src/data/supabaseRepository.ts", "src/data/supabaseClient.ts", "scripts/test-supabase*.mjs", "scripts/test-*-supabase.mjs"]
+alwaysApply: false
+---
+
+- Inspect current schema and migrations (`supabase/migrations/`, latest `0032`) before changes.
+- Prefer additive, reversible migrations; never edit deployed migrations without explicit approval.
+- Review RLS for SELECT, INSERT, UPDATE, DELETE separately; default deny.
+- Test owner, non-owner, unauthenticated, and privileged-role cases.
+- Service-role usage remains server-side (Worker/scripts only); never bundle in frontend.
+- Social and quota mutations use authenticated RPCs; do not trust client ownership fields.
+- Do not apply migrations automatically; document rollback risks.
+- Integration tests: `npm run test:supabase`, `npm run test:rls`, and focused `test:supabase:*` scripts.

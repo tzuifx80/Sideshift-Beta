@@ -1,0 +1,23 @@
+---
+description: Test strategy, validation progression, and assertion quality. Request when adding or fixing tests.
+globs: []
+alwaysApply: false
+---
+
+## Progression
+
+1. Targeted test for the changed behaviour (`vitest run <file>` or focused npm script).
+2. `npm run typecheck`
+3. `npm run lint`
+4. Subsystem tests (Worker, Supabase scripts, Playwright flows as relevant).
+5. `npm run build` when build config or cross-cutting types change.
+
+## Quality
+
+- Test behaviour, not implementation trivia.
+- Reproduce failures before fixing when practical.
+- Include negative, permission-denied, and offline/provider-failure cases where relevant.
+- Stable selectors: roles, labels, or deliberate test IDs; avoid arbitrary sleeps.
+- Distinguish mocked, local, and live Supabase tests in reports.
+- Do not weaken valid assertions to make tests pass.
+- State which checks were not run and why.
