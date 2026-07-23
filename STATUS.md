@@ -1,6 +1,56 @@
 # Status
 
-Completion: `IMPLEMENTED_WITH_DEPLOYMENT_PENDING`
+Completion: `READY_WITH_DOCUMENTED_LANGUAGE_LIMITATIONS`
+
+## Multilingual debate behavior — 2026-07-24
+
+- **Behavioral contract v3** (`debate-opponent-v3`): shared rules in `src/lib/debateContract/`, client `buildDebateContext`, Worker `prompts.ts` v3.
+- **Debate language model**: explicit/Auto modes, lock on first substantive argument, persisted on `AiDebateData` + `DebateSnapshot.language`, restored on resume via `App.tsx` hydration.
+- **Hosted language repair**: one bounded repair inside Worker `generate()` before quota completion (same `requestId`, no replay).
+- **Quality validation**: deterministic checks in `src/lib/debateQuality/`; hosted failures fall back to Reliable Core for supported languages.
+- **Reliable Core honesty**: offline completion for EN/DE/FR/ES/IT only; unsupported offline languages show recoverable UI state.
+- **RTL**: `dir="auto"` on debate messages and composer.
+- **Harness**: `npm run verify:debate-quality` (deterministic + mocked contract; live hosted review manual).
+- **Verification**: 209 Vitest + 12 Worker tests, typecheck, lint, secret scan, production build green in this pass.
+- Live multilingual provider quality and physical-device matrix remain manual.
+
+## SideShift Reliable Core — 2026-07-23
+
+- **Guaranteed baseline:** debates complete through **Reliable Core** (deterministic on-device engine) without hosted AI, Worker, or provider credentials.
+- **Optional enhancement:** hosted SideShift AI (Groq primary, Cloudflare Workers AI fallback) improves naturalness when online and configured.
+- **Router:** `src/lib/debateEngine/` tries hosted enhancement with a deadline, then falls back to Reliable Core automatically.
+- **Contract:** `generateDebateTurn` / `evaluateDebate` with `engineMode`, `engineVersion`, tactic metadata persisted on opponent turns.
+- **Verification:** `npm run verify:reliable-core` (29 Vitest cases across Reliable Core + router).
+- **Android APK:** `android/app/build/outputs/apk/debug/app-debug.apk` includes Reliable Core in web assets (no on-device LLM download).
+- Physical device offline matrix and full browser E2E remain manual.
+
+## SideShift AI platform — 2026-07-23
+
+- **Replaced** user-facing SideShift Basic with **SideShift AI** and a provider-agnostic Worker router.
+- **Primary:** Groq `openai/gpt-oss-120b` (requires `GROQ_API_KEY` secret on Worker).
+- **Fallback:** Cloudflare Workers AI `@cf/qwen/qwen3-30b-a3b-fp8`.
+- Reliability: bounded retry (1/provider), jitter, circuit breaker, idempotent quota RPCs, normalized evaluation schema with legacy API mapping.
+- Benchmark harness: `npm run benchmark:ai` (mock); live requires operator credentials.
+- Gates: 41 Vitest files / 167 tests, typecheck, lint, worker tests (12), secret scan, production build, Android APK — all green in this pass.
+- **Blocked for live Groq verification:** `GROQ_API_KEY` must be set via `wrangler secret put GROQ_API_KEY --env production` before deploy.
+- Production Worker must be redeployed with new provider code; `ALLOWED_ORIGINS` must include real web origin + `https://localhost` for Android.
+- Physical device matrix and full OTP→debate→evaluation browser journey remain manual.
+
+## Interrupted debate recovery — 2026-07-23
+
+- Root cause: hydration preferred `result.take` over an active debate’s `takeId`, desyncing evaluation motion from the saved transcript and causing evaluation retry loops.
+- Fix: `resolveDebateTake()` restores debate-owned take; `ownedTakeIdRef` pins autosave; recovery screen offers resume/home/discard (discard clears only in-progress debate).
+- Tests: `src/lib/debateRecovery.test.ts` (7 cases) + full suite 159 tests green.
+- Worker verify: production `sideshift-basic-api.*.workers.dev` health OK, unauthenticated 401.
+- Android APK: `android/app/build/outputs/apk/debug/app-debug.apk` built with Workers HTTPS endpoint.
+- Browser E2E: not completed (dev API port conflict 8787 vs 8790; app stuck on Connecting during automated pass). Physical device matrix still required.
+
+## Mobile UX and private-beta completeness — 2026-07-23
+
+- Auth OTP: form submit on Enter, email validation before send, code-stage autofocus, guest-failure copy, Android Back on signed-out and onboarding.
+- AI debate: offline guards on send/finish, Basic-specific rule note and setup simplification, min-length hint, retry-review label, sticky composer CSS, debate-focus hides bottom nav.
+- Settings Help: beta feedback form, build/backend/AI facts, privacy links; debate vs interface language labels fixed.
+- Gates: 39 Vitest files / 152 tests, typecheck, lint, worker tests, secret scan, and production build pass. Browser verified home → debate choice → Basic setup → send argument; full evaluation/result/logout browser pass blocked by pre-existing interrupted debate session. Physical Android matrix still pending.
 
 ## Production auth, hosted Basic, and mobile correction phase - 2026-07-21
 
