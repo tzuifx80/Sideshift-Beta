@@ -54,6 +54,10 @@ export function resolveApiBaseUrl(input: ApiConfigInput = {}): string {
     throw new ApiConfigurationError('SideShift server is not configured for this Android build. Set VITE_API_BASE_URL to the hosted HTTPS Worker, or explicitly provide a local development API URL.')
   }
 
+  // Browser development always uses the Vite /api proxy, even when a device-only
+  // VITE_API_BASE_URL is present in .env.local for Android physical-device testing.
+  if (mode === 'development' && platform === 'web') return ''
+
   return configured
 }
 

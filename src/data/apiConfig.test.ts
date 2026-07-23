@@ -4,6 +4,7 @@ import { buildApiUrl, resolveApiBaseUrl } from './apiConfig'
 describe('SideShift API environment routing', () => {
   it('keeps browser development on the Vite relative proxy', () => {
     expect(resolveApiBaseUrl({ mode: 'development', platform: 'web' })).toBe('')
+    expect(resolveApiBaseUrl({ mode: 'development', platform: 'web', apiBaseUrl: 'http://192.0.2.10:8787' })).toBe('')
     expect(buildApiUrl('/api/health', { mode: 'development', platform: 'web' })).toBe('/api/health')
   })
 

@@ -18,4 +18,10 @@ describe('SideShift API CORS', () => {
   it('denies origins outside the configured allow-list', () => {
     expect(getCorsDecision('http://evil.example', new Set(['https://localhost']))).toEqual({ allowed: false, headers: {} })
   })
+
+  it('allows Vite web dev origins when unioned with a device-only allow-list', () => {
+    const devOrigins = new Set(['http://127.0.0.1:5173', 'http://localhost:5173', 'https://localhost'])
+    expect(getCorsDecision('http://127.0.0.1:5173', devOrigins).allowed).toBe(true)
+    expect(getCorsDecision('https://localhost', devOrigins).allowed).toBe(true)
+  })
 })

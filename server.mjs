@@ -21,7 +21,10 @@ const serverProduction = process.env.NODE_ENV === 'production' || appEnvironment
 const mockAi = process.env.MOCK_AI !== 'false' && aiProvider === 'mock'
 const appBaseUrl = process.env.APP_BASE_URL || ''
 const defaultDevelopmentOrigins = 'http://127.0.0.1:5173,http://localhost:5173,https://localhost'
-const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : defaultDevelopmentOrigins)).split(',').map(value => value.trim()).filter(Boolean))
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || (serverProduction ? '' : defaultDevelopmentOrigins)).split(',').map(value => value.trim()).filter(Boolean)
+const allowedOrigins = new Set(serverProduction
+  ? configuredOrigins
+  : [...defaultDevelopmentOrigins.split(',').map(value => value.trim()).filter(Boolean), ...configuredOrigins])
 const aiApiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || ''
 const aiModel = process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini'
 const serverAiMode = mockAi ? 'mock' : aiApiKey ? 'basic_server_available' : 'basic_server_unavailable'
