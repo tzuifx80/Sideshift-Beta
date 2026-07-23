@@ -42,7 +42,10 @@ function errorDetails(error: unknown): { status?: number; message: string } {
 function providerError(error: unknown, phase: 'request' | 'verify', kind: AuthFlowKind): AuthFlowError {
   const details = errorDetails(error)
   if (details.status === 429 || details.message.includes('rate') || details.message.includes('too many')) return new AuthFlowError('rate_limited')
-  if (phase === 'verify' && (details.message.includes('expired') || details.message.includes('otp_expired'))) return new AuthFlowError('expired_code')
+  if (phase === 'verify') {
+    if (details.message.includes('expired') || details.message.includes('otp_expired')) return new AuthFlowError('expired_code')
+    if (details.message.includes('invalid')) return new AuthFlowError('invalid_code')
+  }
   if (kind === 'secure-account' && (details.message.includes('already') || details.message.includes('exists') || details.message.includes('registered'))) return new AuthFlowError('email_in_use')
   return new AuthFlowError(phase === 'request' ? 'otp_request_failed' : 'otp_verification_failed')
 }

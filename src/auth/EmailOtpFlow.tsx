@@ -16,8 +16,9 @@ type EmailOtpFlowProps = {
 
 const RESEND_COOLDOWN_SECONDS = 30
 
-function errorKey(code: AuthFlowErrorCode): 'auth.emailInvalid' | 'auth.otpRequestFailed' | 'auth.otpVerificationFailed' | 'auth.rateLimited' | 'auth.expiredCode' | 'auth.emailInUse' | 'auth.sessionMissing' {
+function errorKey(code: AuthFlowErrorCode): 'auth.emailInvalid' | 'auth.invalidCode' | 'auth.otpRequestFailed' | 'auth.otpVerificationFailed' | 'auth.rateLimited' | 'auth.expiredCode' | 'auth.emailInUse' | 'auth.sessionMissing' {
   if (code === 'invalid_email') return 'auth.emailInvalid'
+  if (code === 'invalid_code') return 'auth.invalidCode'
   if (code === 'rate_limited') return 'auth.rateLimited'
   if (code === 'expired_code') return 'auth.expiredCode'
   if (code === 'email_in_use') return 'auth.emailInUse'

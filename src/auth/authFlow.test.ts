@@ -54,4 +54,13 @@ describe('email authentication flows', () => {
     await expect(verifyEmailOtp(client, 'person@example.com', '123456', 'sign-in')).rejects.toMatchObject({ code: 'rate_limited' })
     await expect(verifyEmailOtp(client, 'person@example.com', '123456', 'sign-in')).rejects.not.toThrow('raw provider secret detail')
   })
+
+  it('maps expired and invalid provider OTP responses to distinct safe categories', async () => {
+    const client = clientFixture()
+    client.auth.verifyOtp.mockResolvedValueOnce({ data: { session: null }, error: { message: 'otp_expired' } })
+    await expect(verifyEmailOtp(client, 'person@example.com', '123456', 'sign-in')).rejects.toMatchObject({ code: 'expired_code' })
+
+    client.auth.verifyOtp.mockResolvedValueOnce({ data: { session: null }, error: { message: 'Token is invalid' } })
+    await expect(verifyEmailOtp(client, 'person@example.com', '123456', 'sign-in')).rejects.toMatchObject({ code: 'invalid_code' })
+  })
 })

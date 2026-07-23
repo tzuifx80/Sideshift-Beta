@@ -56,6 +56,17 @@ describe('SideShift Basic provider', () => {
     expect(fetcher.mock.calls.slice(1).map(call => JSON.parse(String(call[1]?.body)).round)).toEqual([1, 2, 3])
   })
 
+  it('prefers the bearer token over a client-supplied user id for authenticated Worker calls', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ available: true, usage: { allowed: true, debatesRemaining: 3, turnsRemaining: 3 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ response: 'Authenticated counterpoint.' }), { status: 200 }))
+    const provider = createBasicAiProvider({ fetcher: fetcher as typeof fetch, accessToken: 'session-token', userId: 'user-1', apiConfig: { mode: 'development', platform: 'android', apiBaseUrl: 'http://192.0.2.10:8787' } })
+    await provider.getStatus()
+    await provider.streamChat({ modelId: 'sideshift-basic', messages: [{ role: 'user', content: 'An argument with enough detail.' }], maxTokens: 120, debateId: 'debate-1', round: 1, requestId: 'debate-1-turn-1' })
+    expect(fetcher.mock.calls[1][1]?.headers).toMatchObject({ authorization: 'Bearer session-token' })
+    expect(fetcher.mock.calls[1][1]?.headers).not.toHaveProperty('x-sideshift-user-id')
+  })
+
   it('rejects an invalid opponent response instead of leaving an empty stream', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ available: true, usage: { allowed: true, debatesRemaining: 3, turnsRemaining: 3 } }), { status: 200 }))

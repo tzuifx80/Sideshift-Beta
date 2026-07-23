@@ -16,7 +16,6 @@ import {
   interestOptions,
   type DebateSnapshot,
   type AiDebateData,
-  type AiEvaluationData,
   type Language,
   type Mode,
   type ResultData,
@@ -25,6 +24,7 @@ import {
 } from './domain'
 import { AiDebate, AiResults, AiSetup } from './AiMode'
 import { buildEvaluationContext } from './lib/ai/contextBuilder'
+import { aiDebateMotion, createAiDebateCompletionGuard, runAiDebateCompletion } from './aiDebateCompletion'
 import { createMockAiProvider, createUnavailableAiProvider } from './lib/ai/provider'
 import { getOpponent } from './lib/ai/opponents'
 import { createBasicAiProvider } from './lib/ai/basicProvider'
@@ -474,7 +474,7 @@ function App() {
   const [teamSession, setTeamSession] = useState<TeamDebateSession | null>(null)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [teamInitialTopic, setTeamInitialTopic] = useState<{ statement: string; context: string; takeId: string | null; custom: boolean } | undefined>()
-  const aiCompletionRef = useRef(new Set<string>())
+  const aiCompletionGuardRef = useRef(createAiDebateCompletionGuard())
   const teamCompletionRef = useRef(new Set<string>())
   const personalStats = useMemo(() => calculatePersonalStats(history, statsSnapshot), [history, statsSnapshot])
   const debateSaveQueueRef = useRef(Promise.resolve())
@@ -524,7 +524,7 @@ function App() {
     setToast('')
     debateSaveQueueRef.current = Promise.resolve()
     latestQueuedDebateRef.current = null
-    aiCompletionRef.current.clear()
+    aiCompletionGuardRef.current.clear()
     teamCompletionRef.current.clear()
   }, [auth.signedOut])
   useEffect(() => {
@@ -653,10 +653,10 @@ function App() {
 
   useEffect(() => {
     if (!repository || !userId || hydratedUserId !== userId || screen !== 'aiDebate' || !debateId || !aiConfig || !aiSnapshot) return
-    if (aiCompletionRef.current.has(debateId)) return
+    if (aiCompletionGuardRef.current.isActive(debateId)) return
     const currentDebateId = debateId
     const timeout = window.setTimeout(() => {
-      if (aiCompletionRef.current.has(currentDebateId)) return
+      if (aiCompletionGuardRef.current.isActive(currentDebateId)) return
       const debate: DebateSnapshot = { id: debateId, takeId: activeTake.id, mode: 'classic', step: aiSnapshot.roundLimit, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: aiConfig.userSide, language, status: 'active', updatedAt: new Date().toISOString(), ai: aiSnapshot }
       void repository.saveDebate(userId, debate).catch(caught => setDataError(caught instanceof Error ? caught.message : 'Private AI debate data could not be saved.'))
     }, 250)
@@ -785,38 +785,26 @@ function App() {
 
   async function completeAiDebate(transcript: AiDebateData['transcript']) {
     if (!repository || !userId || !debateId || !aiConfig || !aiSnapshot) throw new Error('The active AI debate is not available.')
-    const currentDebateId = debateId
-    if (aiCompletionRef.current.has(currentDebateId)) return
-    aiCompletionRef.current.add(currentDebateId)
-    const currentSnapshot = aiSnapshot
-    const contextTranscript = transcript.map(turn => ({ role: turn.role === 'opponent' ? 'assistant' as const : 'user' as const, round: turn.round, content: turn.content }))
-    let evaluation: AiEvaluationData | undefined
-    try {
-      const response = await aiProvider.evaluate(buildEvaluationContext({ motion: currentSnapshot.customMotion || takeText(aiTake, language).statement, userSide: aiConfig.userSide, aiSide: aiConfig.aiSide, language, transcript: contextTranscript }), currentSnapshot.modelId, { debateId: currentDebateId, requestId: `${currentDebateId}-evaluation` })
-      evaluation = response
-    } catch (caught) {
-      notify(`AI review unavailable: ${caught instanceof Error ? caught.message : 'the review request failed.'}`)
-    }
-    const now = new Date().toISOString()
-    const scoreRows = evaluation ? [
-      { label: 'Clarity', score: evaluation.clarity, explanation: evaluation.strongestPoint },
-      { label: 'Relevance', score: evaluation.relevance, explanation: evaluation.missedCounterargument },
-      { label: 'Reasoning', score: evaluation.reasoning, explanation: evaluation.weakestAssumption },
-      { label: 'Rebuttal', score: evaluation.rebuttal, explanation: evaluation.missedCounterargument },
-      { label: 'Fairness', score: evaluation.fairness, explanation: evaluation.argumentDna },
-    ] : []
-    const completedSnapshot: AiDebateData = { ...currentSnapshot, transcript, partialResponse: '', interrupted: false, completionReason: 'completed' }
-    const result: ResultData = { id: makeUuid(), debateId: currentDebateId, score: evaluation ? scoreRows.reduce((sum, item) => sum + item.score, 0) : null, movement: 0, understanding: 'yes', mode: 'classic', take: aiTake, assignedSide: aiConfig.userSide, transcript: transcript.map(turn => ({ role: turn.role, round: turn.round, content: turn.content })), scores: scoreRows, coaching: evaluation?.argumentDna || 'AI review unavailable. Your completed debate was preserved without an invented score.', completedAt: now, ai: { opponentId: aiConfig.opponent.id, family: aiConfig.opponent.family, modelId: currentSnapshot.modelId, difficulty: aiConfig.difficulty, roundLength: aiConfig.roundLength, quality: aiConfig.quality, responseLength: aiConfig.responseLength, modelSelection: aiConfig.modelSelection, roundLimit: currentSnapshot.roundLimit, customMotion: currentSnapshot.customMotion, evaluationAvailable: Boolean(evaluation), evaluation } }
-    const completedDebate: DebateSnapshot = { id: currentDebateId, takeId: aiTake.id, mode: 'classic', step: currentSnapshot.roundLimit, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: aiConfig.userSide, language, status: 'completed', updatedAt: now, ai: completedSnapshot }
-    try {
-      await repository.saveDebate(userId, completedDebate)
-      await repository.saveResult(userId, result)
-      const nextHistory = [result, ...history.filter(item => item.id !== result.id)].slice(0, 20)
-      setLastResult(result); setHistory(nextHistory); setAiSnapshot(completedSnapshot); setDebateId(''); setScreen('aiResults'); setStatsSnapshot(current => ({ ...current, activityDates: [...current.activityDates, now] })); trackEvent('debate_completed', { score: result.score, movement: 0, ai_opponent: aiConfig.opponent.id })
-    } catch (caught) {
-      aiCompletionRef.current.delete(currentDebateId)
-      notify(caught instanceof Error ? 'AI result could not be saved: ' + caught.message : 'AI result could not be saved. Try again.')
-    }
+    const outcome = await runAiDebateCompletion({
+      debateId,
+      transcript,
+      aiTake,
+      aiConfig,
+      aiSnapshot,
+      language,
+      repository,
+      userId,
+      guard: aiCompletionGuardRef.current,
+      makeId: makeUuid,
+      evaluate: async () => {
+        const contextTranscript = transcript.map(turn => ({ role: turn.role === 'opponent' ? 'assistant' as const : 'user' as const, round: turn.round, content: turn.content }))
+        return aiProvider.evaluate(buildEvaluationContext({ motion: aiDebateMotion(aiTake, language, aiSnapshot.customMotion), userSide: aiConfig.userSide, aiSide: aiConfig.aiSide, language, transcript: contextTranscript }), aiSnapshot.modelId, { debateId, requestId: `${debateId}-evaluation` })
+      },
+    })
+    if (outcome.status === 'aborted') return
+    const now = outcome.result.completedAt
+    const nextHistory = [outcome.result, ...history.filter(item => item.id !== outcome.result.id)].slice(0, 20)
+    setLastResult(outcome.result); setHistory(nextHistory); setAiSnapshot(outcome.completedSnapshot); setDebateId(''); setScreen('aiResults'); setStatsSnapshot(current => ({ ...current, activityDates: [...current.activityDates, now] })); trackEvent('debate_completed', { score: outcome.result.score, movement: 0, ai_opponent: aiConfig.opponent.id })
   }
 
   async function exitAiDebate() {

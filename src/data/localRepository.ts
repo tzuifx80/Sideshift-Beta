@@ -1,5 +1,6 @@
 import { clearState, loadState, saveState, type PersistedState } from '../storage'
 import type { AiFeedbackInput, AppRepository, BetaFeedbackInput, ChallengeRecord, ChallengeResolved, FriendChallengeRecord, FriendshipRecord, GroupFriendInvitation, ProfilePreview, ReportInput, WorldPulseDraftInput } from './repository'
+import { RepositoryError } from './repository'
 import type { BackendName, RepositoryDiagnostics, UserPreferences, UserProfile, UserStatsSnapshot } from './types'
 import { makeUuid } from '../domain'
 import type { CreateGroupInput, CreateGroupTopicInput, GroupDetail, GroupInvite, GroupRole, GroupSummary } from '../collaboration'
@@ -75,6 +76,14 @@ export function createLocalRepository(): AppRepository {
     async saveDebate(userId, debate) {
       const state = cloneState()
       saveState({ ...state, userId, debate })
+    },
+    async saveDebateWithResult(userId, debate, result) {
+      if (debate.status !== 'completed') throw new RepositoryError('validation', 'A completed debate snapshot is required.')
+      if (!result.debateId || result.debateId !== debate.id) throw new RepositoryError('validation', 'The result must reference the completed debate.')
+      const state = cloneState()
+      const history = state.userId === userId ? state.history : []
+      const nextHistory = [result, ...history.filter(item => item.id !== result.id)].slice(0, 20)
+      saveState({ ...state, userId, debate, result, history: nextHistory })
     },
     async loadResult(userId) {
       const state = cloneState()

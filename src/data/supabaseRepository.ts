@@ -605,13 +605,36 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     return data ? mapResultRow(data) : null
   }
 
+  async function persistResultRow(userId: string, result: ResultData): Promise<void> {
+    const { error } = await client.from('debate_results').upsert({ id: result.id, debate_id: result.debateId, owner_id: userId, scores: result.scores, argument_dna: result, coaching: result.coaching, model_provider: 'server-ai-or-mock' }, { onConflict: 'debate_id' })
+    if (error) throw mapSupabaseError('saving your result', error)
+  }
+
+  async function recordResultLeagueActivity(result: ResultData): Promise<void> {
+    if (!result.debateId) return
+    const league = await client.rpc('record_league_activity', { p_completion_id: result.debateId, p_activity_type: 'completed_debate', p_group_id: null, p_is_mock: Boolean(result.ai && !result.ai.evaluationAvailable) })
+    if (league.error && !isLeagueSchemaUnavailable(league.error)) throw mapSupabaseError('recording your private league activity', league.error)
+  }
+
   async function saveResult(userId: string, result: ResultData | null): Promise<void> {
     if (!result) return
     if (!result.debateId) throw new RepositoryErrorClass('validation', 'A completed result must reference its debate.')
-    const { error } = await client.from('debate_results').upsert({ id: result.id, debate_id: result.debateId, owner_id: userId, scores: result.scores, argument_dna: result, coaching: result.coaching, model_provider: 'server-ai-or-mock' }, { onConflict: 'debate_id' })
-    if (error) throw mapSupabaseError('saving your result', error)
-    const league = await client.rpc('record_league_activity', { p_completion_id: result.debateId, p_activity_type: 'completed_debate', p_group_id: null, p_is_mock: Boolean(result.ai && !result.ai.evaluationAvailable) })
-    if (league.error && !isLeagueSchemaUnavailable(league.error)) throw mapSupabaseError('recording your private league activity', league.error)
+    await persistResultRow(userId, result)
+    await recordResultLeagueActivity(result)
+  }
+
+  async function saveDebateWithResult(userId: string, debate: DebateSnapshot, result: ResultData): Promise<void> {
+    if (debate.status !== 'completed') throw new RepositoryErrorClass('validation', 'A completed debate snapshot is required.')
+    if (!result.debateId || result.debateId !== debate.id) throw new RepositoryErrorClass('validation', 'The result must reference the completed debate.')
+    const key = debate.id
+    const previous = saveQueues.get(key) || Promise.resolve()
+    const next = previous.catch(() => undefined).then(async () => {
+      await persistResultRow(userId, result)
+      await saveDebateNow(userId, debate)
+      await recordResultLeagueActivity(result)
+    })
+    saveQueues.set(key, next)
+    try { await next } finally { if (saveQueues.get(key) === next) saveQueues.delete(key) }
   }
 
   async function loadHistory(userId: string): Promise<ResultData[]> {
@@ -862,5 +885,5 @@ export function createSupabaseRepository(client: SupabaseClient): AppRepository 
     if (error && !isLeagueSchemaUnavailable(error)) throw mapSupabaseError('recording private league activity', error)
   }
 
-  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, getProfileForViewer, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation, listWorldPulse, listWorldPulseEditorItems, saveWorldPulseDraft, reviewWorldPulseItem, joinFriendsLeague, joinGroupLeague, leaveLeague, loadLeagueDashboard, recordLeagueActivity }
+  return { backend, diagnostics: () => diagnostics, loadProfile, saveProfile, loadPreferences, savePreferences, getPrivateProfile, getProfileForViewer, lookupProfileByHandle, lookupProfileByFriendCode, regenerateFriendCode, listFriendships, sendFriendRequest, updateFriendRequest, listBlocks, blockUser, unblockUser, uploadAvatar, removeAvatar, getAvatarUrl, createFriendChallenge, listFriendChallenges, completeFriendChallenge, listGroupFriendInvitations, createGroupFriendInvitation, respondGroupFriendInvitation, loadDebate, saveDebate, saveDebateWithResult, loadResult, saveResult, loadHistory, saveHistory, loadStats, createChallenge, loadChallenge, listChallenges, revokeChallenge, deleteMyBetaData, respondToChallenge, submitReport, recordAiFeedback, submitBetaFeedback, loadTeamSession, saveTeamSession, listGroups, createGroup, loadGroup, createGroupInvite, joinGroupByInvite, createGroupTopic, recordGroupParticipation, listWorldPulse, listWorldPulseEditorItems, saveWorldPulseDraft, reviewWorldPulseItem, joinFriendsLeague, joinGroupLeague, leaveLeague, loadLeagueDashboard, recordLeagueActivity }
 }

@@ -109,6 +109,7 @@ export type AppRepository = {
   respondGroupFriendInvitation(userId: string, invitationId: string, action: 'accept' | 'decline'): Promise<void>
   loadDebate(userId: string): Promise<DebateSnapshot | null>
   saveDebate(userId: string, debate: DebateSnapshot | null): Promise<void>
+  saveDebateWithResult(userId: string, debate: DebateSnapshot, result: ResultData): Promise<void>
   loadResult(userId: string): Promise<ResultData | null>
   saveResult(userId: string, result: ResultData | null): Promise<void>
   loadHistory(userId: string): Promise<ResultData[]>
