@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AuthFlowError, authFlowErrorCode, requestEmailOtp, verifyEmailOtp, type AuthFlowClient } from './auth/authFlow'
 import { hasSignedOutPreference, shouldIgnoreAuthStateChange, signOutAndClear } from './logout'
 import { getOrCreateAnonymousSession } from './data/supabaseClient'
@@ -19,16 +19,18 @@ function storageFixture(values: Record<string, string>): Storage {
 }
 
 describe('v0.2 private beta vertical slice contracts', () => {
-  it('keeps OTP sign-in explicit and maps invalid versus expired codes honestly', async () => {
+  it('keeps open OTP registration explicit and maps invalid versus expired codes honestly', async () => {
+    const signInWithOtp = vi.fn(async () => ({ error: null }))
     const client = {
       auth: {
-        signInWithOtp: async () => ({ error: null }),
+        signInWithOtp,
         updateUser: async () => ({ data: { user: { id: 'guest-1' } }, error: null }),
         verifyOtp: async () => ({ data: { session: { user: { id: 'user-1' }, access_token: 'token-1' } }, error: null }),
       },
     } as unknown as AuthFlowClient
 
     await requestEmailOtp(client, 'person@example.com', 'sign-in')
+    expect(signInWithOtp).toHaveBeenCalledWith({ email: 'person@example.com', options: { shouldCreateUser: true } })
     const session = await verifyEmailOtp(client, 'person@example.com', '123456', 'sign-in')
     expect(session.access_token).toBe('token-1')
     expect(authFlowErrorCode(new AuthFlowError('expired_code'))).toBe('expired_code')

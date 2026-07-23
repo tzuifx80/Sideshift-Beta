@@ -17,7 +17,7 @@
 - Build warnings from Puter CommonJS interop and large chunks remain unchanged.
 - Browser screenshot automation was unavailable in this workspace; target viewport evidence is therefore limited to static responsive contracts and successful builds. Manual 320/360/375/390/412px, Large Text, dark-mode, and multilingual visual checks remain required.
 - Dedicated native camera capture is not guaranteed: the installed Android project still contains only App, Browser, and Share Capacitor plugins. The avatar flow remains honest about system picker support.
-- Email OTP account security/sign-in is implemented. Supabase Dashboard manual identity linking and the OTP email template still require one-time configuration before the production beta flow can be considered end-to-end verified.
+- Email OTP unified signup/sign-in and guest account security are implemented. Supabase Dashboard sign-up, email OTP, manual identity linking, custom SMTP, and the OTP email template still require one-time configuration before the production beta flow can be considered end-to-end verified.
 - The logout/avatar repair is covered by deterministic unit tests, but the physical Android system-picker, private Storage upload, restart persistence, and sign-out/relaunch checks remain pending because `adb` is unavailable here.
 - Human profile targets in Friends, Groups, direct challenges, and completed friend-challenge rows now open the privacy-aware profile detail. The current debate history contains no human participant identity rows; AI opponents remain intentionally non-clickable.
 - The preview selector uses the shared client visibility rules for simulated audiences; the actual profile route uses the server resolver. A separate owner-only “act as viewer” RPC was not added.

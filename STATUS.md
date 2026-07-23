@@ -4,7 +4,7 @@ Completion: `IMPLEMENTED_WITH_DEPLOYMENT_PENDING`
 
 ## Production auth, hosted Basic, and mobile correction phase - 2026-07-21
 
-- Signed-out welcome now has deliberate Continue as guest, Sign in, and Learn about SideShift actions. Guest creation is explicit; email sign-in uses six-digit OTP with `shouldCreateUser: false`, bounded resend, safe errors, and no raw provider details in UI.
+- Signed-out welcome now has deliberate Continue as guest, Continue with email, and Learn about SideShift actions. Guest creation is explicit; email access uses six-digit OTP with `shouldCreateUser: true`, bounded resend, safe errors, and no raw provider details in UI.
 - Active anonymous users can secure the same identity through Supabase email-change OTP. Profile, settings, debates, friends, Groups, leagues, points, preferences, and onboarding remain attached to the original user ID.
 - The live onboarding route is three stages: Welcome, SideSwitch, and Personalize/start. The old debate-mode step is unreachable and its mode-choice copy was removed from the active translation set; mode selection remains after Start Debate.
 - Group detail is now a compact header/actions/invite/tabs structure. Invite display is grouped, copy/share-safe, screen-reader readable, and keeps the stored secure token unchanged. Friends is one tabbed destination for Friends, Requests, and League.

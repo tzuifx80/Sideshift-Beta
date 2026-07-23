@@ -7,6 +7,7 @@ import type { AppRepository } from '../data/repository'
 import { defaultProfileFieldVisibility } from '../profile'
 import { clearSignedOutPreference, hasSignedOutPreference, logoutDiagnostic, shouldIgnoreAuthStateChange, signOutAndClear } from '../logout'
 import { authFlowErrorCode, requestEmailOtp, verifyEmailOtp, type AuthFlowClient, type AuthFlowKind } from './authFlow'
+import { assertAuthClientAvailable, continueGuestSession, guestAuthFailureMessage, SUPABASE_CONFIG_MISSING_MESSAGE } from './guestAuth'
 
 export type AuthState = {
   user: User | null
@@ -46,7 +47,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState({ user: null, userId: local.userId, accessToken: null, loading: false, error: null, backend, repository, signedOut: false })
       return () => undefined
     }
-    const config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
+    let config
+    try {
+      config = readSupabaseConfig(import.meta.env as Record<string, string | undefined>)
+    } catch {
+      clientRef.current = null
+      setState({ user: null, userId: null, accessToken: null, loading: false, error: SUPABASE_CONFIG_MISSING_MESSAGE, backend, repository: null, signedOut: true })
+      return () => undefined
+    }
     const client = createSupabaseBrowserClient(config)
     clientRef.current = client
     if (hasSignedOutPreference() && !allowAnonymousCreationRef.current) {
@@ -59,7 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const deliberateGuestContinuation = allowAnonymousCreationRef.current
     try {
-      const session = await getOrCreateAnonymousSession(client, { allowAnonymousCreation: deliberateGuestContinuation, allowSignedOutContinuation: deliberateGuestContinuation })
+      const session = deliberateGuestContinuation
+        ? await continueGuestSession(client)
+        : await getOrCreateAnonymousSession(client)
       if (!session) {
         setState({ user: null, userId: null, accessToken: null, loading: false, error: null, backend, repository: null, signedOut: true })
         return () => undefined
@@ -79,9 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session, repository)
       const subscription = client.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession, repository))
       return () => subscription.data.subscription.unsubscribe()
-    } catch {
+    } catch (caught) {
       allowAnonymousCreationRef.current = false
-      if (deliberateGuestContinuation) setSession(null, null)
+      if (deliberateGuestContinuation) setSession(null, null, guestAuthFailureMessage(caught))
       else setSession(null, null, 'Authentication is temporarily unavailable. Please retry.')
       return () => undefined
     }
@@ -126,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
   const runEmailFlow = useCallback(async (email: string, kind: AuthFlowKind, code?: string) => {
     const client = clientRef.current
-    if (backend !== 'supabase' || !client) throw new Error('Authentication is not available in this build.')
+    assertAuthClientAvailable(backend, client)
     try {
       if (code === undefined) {
         await requestEmailOtp(client as unknown as AuthFlowClient, email, kind)

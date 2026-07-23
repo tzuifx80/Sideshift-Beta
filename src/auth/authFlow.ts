@@ -10,7 +10,7 @@ export type AuthFlowClient = {
   }
 }
 
-export type AuthFlowErrorCode = 'invalid_email' | 'invalid_code' | 'otp_request_failed' | 'otp_verification_failed' | 'rate_limited' | 'expired_code' | 'email_in_use' | 'session_missing'
+export type AuthFlowErrorCode = 'invalid_email' | 'invalid_code' | 'otp_request_failed' | 'otp_verification_failed' | 'rate_limited' | 'expired_code' | 'email_in_use' | 'session_missing' | 'auth_config_disabled'
 
 export class AuthFlowError extends Error {
   constructor(public readonly code: AuthFlowErrorCode) {
@@ -33,14 +33,27 @@ function normalizeOtp(value: string): string {
   return otp
 }
 
-function errorDetails(error: unknown): { status?: number; message: string } {
-  if (!error || typeof error !== 'object') return { message: '' }
-  const candidate = error as { status?: unknown; message?: unknown }
-  return { status: typeof candidate.status === 'number' ? candidate.status : undefined, message: typeof candidate.message === 'string' ? candidate.message.toLowerCase() : '' }
+function errorDetails(error: unknown): { status?: number; message: string; code: string } {
+  if (!error || typeof error !== 'object') return { message: '', code: '' }
+  const candidate = error as { status?: unknown; message?: unknown; code?: unknown }
+  return {
+    status: typeof candidate.status === 'number' ? candidate.status : undefined,
+    message: typeof candidate.message === 'string' ? candidate.message.toLowerCase() : '',
+    code: typeof candidate.code === 'string' ? candidate.code.toLowerCase() : '',
+  }
+}
+
+function isAuthConfigDisabled(details: { message: string; code: string }): boolean {
+  return details.code === 'signup_disabled'
+    || details.code === 'otp_disabled'
+    || details.message.includes('signups not allowed')
+    || details.message.includes('otp disabled')
+    || details.message.includes('otp_disabled')
 }
 
 function providerError(error: unknown, phase: 'request' | 'verify', kind: AuthFlowKind): AuthFlowError {
   const details = errorDetails(error)
+  if (phase === 'request' && kind === 'sign-in' && isAuthConfigDisabled(details)) return new AuthFlowError('auth_config_disabled')
   if (details.status === 429 || details.message.includes('rate') || details.message.includes('too many')) return new AuthFlowError('rate_limited')
   if (phase === 'verify') {
     if (details.message.includes('expired') || details.message.includes('otp_expired')) return new AuthFlowError('expired_code')
@@ -58,7 +71,7 @@ export async function requestEmailOtp(client: AuthFlowClient, rawEmail: string, 
     if (!result.data?.user) throw new AuthFlowError('otp_request_failed')
     return email
   }
-  const result = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
+  const result = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
   if (result.error) throw providerError(result.error, 'request', kind)
   return email
 }
@@ -74,6 +87,6 @@ export async function verifyEmailOtp(client: AuthFlowClient, rawEmail: string, r
 
 export function authFlowErrorCode(error: unknown): AuthFlowErrorCode {
   if (error instanceof AuthFlowError) return error.code
-  if (error instanceof Error && ['invalid_email', 'invalid_code', 'otp_request_failed', 'otp_verification_failed', 'rate_limited', 'expired_code', 'email_in_use', 'session_missing'].includes(error.message)) return error.message as AuthFlowErrorCode
+  if (error instanceof Error && ['invalid_email', 'invalid_code', 'otp_request_failed', 'otp_verification_failed', 'rate_limited', 'expired_code', 'email_in_use', 'session_missing', 'auth_config_disabled'].includes(error.message)) return error.message as AuthFlowErrorCode
   return 'otp_verification_failed'
 }

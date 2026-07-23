@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getOrCreateAnonymousSession } from './supabaseClient'
+import { getOrCreateAnonymousSession, readSupabaseConfig } from './supabaseClient'
 
 function storageFixture(values: Record<string, string>): Storage {
   const map = new Map(Object.entries(values))
@@ -15,6 +15,11 @@ function storageFixture(values: Record<string, string>): Storage {
 }
 
 describe('Supabase authentication bootstrap', () => {
+  it('fails safely when Supabase configuration is missing', () => {
+    expect(() => readSupabaseConfig({})).toThrow('VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing.')
+    expect(() => readSupabaseConfig({ VITE_SUPABASE_URL: 'https://example.supabase.co' })).toThrow('VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing.')
+  })
+
   it('reuses a valid existing session without another authentication request', async () => {
     const session = { user: { id: 'user-1' }, access_token: '' }
     const signInAnonymously = vi.fn()

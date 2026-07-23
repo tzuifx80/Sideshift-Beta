@@ -2,7 +2,7 @@
 
 ## Production auth, hosted Basic, and final mobile correction checkpoint - 2026-07-21
 
-- Auth flow now has explicit guest creation, email OTP sign-in without implicit account creation, and email-change OTP to secure an active anonymous account without changing its UUID. Auth errors are mapped to safe UI categories; the signed-out marker clears only after verified success.
+- Auth flow now has explicit guest creation, unified email OTP signup/sign-in with `shouldCreateUser: true`, and email-change OTP to secure an active anonymous account without changing its UUID. Auth errors are mapped to safe UI categories; the signed-out marker clears only after verified success.
 - The live onboarding route is three stages: Welcome, SideSwitch, Personalize/start. Group detail uses compact tabs and grouped invite display; Friends uses Friends, Requests, and League tabs.
 - `worker/` contains the Wrangler/Workers AI implementation, scoped CORS, Supabase bearer validation, existing quota RPC calls, health/capability routes, deployment README, and `scripts/verify-worker.mjs`. Local Worker tests pass; Wrangler dry-run passes with explicit production bindings.
 - Applied migrations remain unchanged through `0032`; no invite migration was needed because display formatting is derived from the existing secure token.

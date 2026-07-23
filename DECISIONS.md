@@ -2,7 +2,7 @@
 
 ## 2026-07-21 Production auth, hosted Basic, and final mobile correction
 
-- Signed-out state stays durable until a deliberate authentication action succeeds. Continue as guest calls anonymous sign-in; email sign-in uses `signInWithOtp({ options: { shouldCreateUser: false } })` so an unknown email is not silently turned into a new account.
+- Signed-out state stays durable until a deliberate authentication action succeeds. Continue as guest calls anonymous sign-in; email access uses `signInWithOtp({ options: { shouldCreateUser: true } })` so a new email creates an account and an existing email signs in through the same OTP flow without exposing which case applies.
 - Account security uses `updateUser({ email })` followed by `verifyOtp({ type: 'email_change' })`, preserving the anonymous user's UUID and all data. The OTP UI is six digits with a 30-second resend cooldown and safe, non-enumerating error categories.
 - The production Basic boundary is the Cloudflare Worker. It validates `Authorization: Bearer` against Supabase Auth, derives the user ID, rejects mismatched legacy identity headers, and uses only the pre-existing service-role quota RPCs because those functions explicitly require the service role. The client never receives that key.
 - Worker AI uses the direct Workers AI binding with `@cf/qwen/qwen3-30b-a3b-fp8` by default, preserves `/no_think` for Qwen 3, keeps the Node API for local development, and returns explicit unavailable/quota/rate-limit/idempotency states.
