@@ -7,6 +7,10 @@
   "ai": { "binding": "AI" },
   "vars": {
     "APP_ENV": "production",
+    "AI_PRIMARY_PROVIDER": "groq",
+    "AI_PRIMARY_MODEL": "openai/gpt-oss-120b",
+    "AI_FALLBACK_PROVIDER": "cloudflare",
+    "AI_FALLBACK_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
     "BASIC_AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
     "BASIC_AI_DAILY_DEBATES": "3",
     "BASIC_AI_MAX_ROUNDS": "3",
@@ -18,12 +22,12 @@
     "staging": {
       "name": "sideshift-basic-api-staging",
       "ai": { "binding": "AI" },
-      "vars": { "APP_ENV": "staging", "BASIC_AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8", "BASIC_AI_DAILY_DEBATES": "3", "BASIC_AI_MAX_ROUNDS": "3", "BASIC_AI_MAX_INPUT_CHARS": "8000", "BASIC_AI_MAX_OUTPUT_TOKENS": "180", "ALLOWED_ORIGINS": "https://localhost,http://127.0.0.1:5173,http://localhost:5173" }
+      "vars": { "APP_ENV": "staging", "AI_PRIMARY_PROVIDER": "groq", "AI_PRIMARY_MODEL": "openai/gpt-oss-120b", "AI_FALLBACK_PROVIDER": "cloudflare", "AI_FALLBACK_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8", "BASIC_AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8", "BASIC_AI_DAILY_DEBATES": "3", "BASIC_AI_MAX_ROUNDS": "3", "BASIC_AI_MAX_INPUT_CHARS": "8000", "BASIC_AI_MAX_OUTPUT_TOKENS": "180", "ALLOWED_ORIGINS": "https://localhost,http://127.0.0.1:5173,http://localhost:5173" }
     },
     "production": {
       "name": "sideshift-basic-api",
       "ai": { "binding": "AI" },
-      "vars": { "APP_ENV": "production", "BASIC_AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8", "BASIC_AI_DAILY_DEBATES": "3", "BASIC_AI_MAX_ROUNDS": "3", "BASIC_AI_MAX_INPUT_CHARS": "8000", "BASIC_AI_MAX_OUTPUT_TOKENS": "180", "ALLOWED_ORIGINS": "https://localhost" }
+      "vars": { "APP_ENV": "production", "AI_PRIMARY_PROVIDER": "groq", "AI_PRIMARY_MODEL": "openai/gpt-oss-120b", "AI_FALLBACK_PROVIDER": "cloudflare", "AI_FALLBACK_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8", "BASIC_AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8", "BASIC_AI_DAILY_DEBATES": "3", "BASIC_AI_MAX_ROUNDS": "3", "BASIC_AI_MAX_INPUT_CHARS": "8000", "BASIC_AI_MAX_OUTPUT_TOKENS": "180", "ALLOWED_ORIGINS": "https://localhost" }
     }
   }
 }
