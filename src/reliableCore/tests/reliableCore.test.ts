@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { takes } from '../../domain'
 import { analyzeArgument } from '../argumentAnalysis'
 import { escapeClaimFragment, extractClaimFragment } from '../claimExtraction'
-import { validateDebatePacks, validatePrivateTakePack, resolveDebatePack } from '../debatePacks'
+import { validateDebatePacks, validatePrivateTakePack, resolveDebatePack, CURATED_PACKS } from '../debatePacks'
 import { evaluateLocally } from '../evaluation'
 import { generateDebateTurn, evaluateDebate } from '../engine'
 import { seededIndex } from '../seed'
@@ -169,6 +169,13 @@ describe('debate packs', () => {
     expect(curated.commonContraClaims.length).toBeGreaterThan(2)
     expect(curated.topicKeywords).toContain('teenagers')
     expect(curated.takeId).toBe('society-media-age')
+  })
+
+  it('maps every curated pack key to a real take id', () => {
+    const takeIds = new Set(takes.map(take => take.id))
+    for (const takeId of Object.keys(CURATED_PACKS)) {
+      expect(takeIds.has(takeId), `missing take for curated pack ${takeId}`).toBe(true)
+    }
   })
 
   it('falls back to generic pack for unknown takes', () => {
