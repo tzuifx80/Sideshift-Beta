@@ -12,11 +12,15 @@ import { teamMessages } from './team'
 import { responseMessages } from './response'
 import { groupMessages } from './groups'
 import { phase3Messages, phase3OnboardingMessages } from './phase3'
+import { reliableCoreMessages } from './reliableCore'
+import { debateLanguageMessages } from './debateLanguage'
 import { phase4OnboardingMessages } from './phase4Onboarding'
 import { phase5ProfileMessages } from './phase5Profile'
 import { phase6PulseLeagueMessages } from './phase6PulseLeague'
 import { authMessages } from './auth'
 import { friendsMessages } from './friends'
+import { debateRecoveryMessages } from './debateRecovery'
+import { polishMessages } from './polish'
 import type { LocaleMessages, TranslationKey, Translator } from './types'
 
 export { supportedLanguages } from './types'
@@ -25,11 +29,11 @@ export type { TranslationKey, Translator } from './types'
 export const LOCALE_STORAGE_KEY = 'sideshift-locale-v1'
 export const localeLabels: Record<Language, string> = { en: 'English', de: 'Deutsch', fr: 'Français', es: 'Español', it: 'Italiano' }
 const locales: Record<Language, LocaleMessages> = {
-  en: Object.assign({}, en, phase2Messages.en, phase3Messages.en, phase3OnboardingMessages.en, phase4OnboardingMessages.en, phase5ProfileMessages.en, phase6PulseLeagueMessages.en, debateMessages.en, stanceMessages.en, resultsMessages.en, activeAiMessages.en, teamMessages.en, responseMessages.en, groupMessages.en) as LocaleMessages,
-  de: Object.assign({}, de, phase2Messages.de, phase3Messages.de, phase3OnboardingMessages.de, phase4OnboardingMessages.de, phase5ProfileMessages.de, phase6PulseLeagueMessages.de, debateMessages.de, stanceMessages.de, resultsMessages.de, activeAiMessages.de, teamMessages.de, responseMessages.de, groupMessages.de) as LocaleMessages,
-  fr: Object.assign({}, fr, phase2Messages.fr, phase3Messages.fr, phase3OnboardingMessages.fr, phase4OnboardingMessages.fr, phase5ProfileMessages.fr, phase6PulseLeagueMessages.fr, debateMessages.fr, stanceMessages.fr, resultsMessages.fr, activeAiMessages.fr, teamMessages.fr, responseMessages.fr, groupMessages.fr) as LocaleMessages,
-  es: Object.assign({}, es, phase2Messages.es, phase3Messages.es, phase3OnboardingMessages.es, phase4OnboardingMessages.es, phase5ProfileMessages.es, phase6PulseLeagueMessages.es, debateMessages.es, stanceMessages.es, resultsMessages.es, activeAiMessages.es, teamMessages.es, responseMessages.es, groupMessages.es) as LocaleMessages,
-  it: Object.assign({}, it, phase2Messages.it, phase3Messages.it, phase3OnboardingMessages.it, phase4OnboardingMessages.it, phase5ProfileMessages.it, phase6PulseLeagueMessages.it, debateMessages.it, stanceMessages.it, resultsMessages.it, activeAiMessages.it, teamMessages.it, responseMessages.it, groupMessages.it) as LocaleMessages,
+  en: Object.assign({}, en, phase2Messages.en, phase3Messages.en, phase3OnboardingMessages.en, phase4OnboardingMessages.en, phase5ProfileMessages.en, phase6PulseLeagueMessages.en, debateMessages.en, stanceMessages.en, resultsMessages.en, activeAiMessages.en, teamMessages.en, responseMessages.en, groupMessages.en, reliableCoreMessages.en, debateLanguageMessages.en, polishMessages.en) as LocaleMessages,
+  de: Object.assign({}, de, phase2Messages.de, phase3Messages.de, phase3OnboardingMessages.de, phase4OnboardingMessages.de, phase5ProfileMessages.de, phase6PulseLeagueMessages.de, debateMessages.de, stanceMessages.de, resultsMessages.de, activeAiMessages.de, teamMessages.de, responseMessages.de, groupMessages.de, reliableCoreMessages.de, debateLanguageMessages.de, polishMessages.de) as LocaleMessages,
+  fr: Object.assign({}, fr, phase2Messages.fr, phase3Messages.fr, phase3OnboardingMessages.fr, phase4OnboardingMessages.fr, phase5ProfileMessages.fr, phase6PulseLeagueMessages.fr, debateMessages.fr, stanceMessages.fr, resultsMessages.fr, activeAiMessages.fr, teamMessages.fr, responseMessages.fr, groupMessages.fr, reliableCoreMessages.fr, debateLanguageMessages.fr, polishMessages.fr) as LocaleMessages,
+  es: Object.assign({}, es, phase2Messages.es, phase3Messages.es, phase3OnboardingMessages.es, phase4OnboardingMessages.es, phase5ProfileMessages.es, phase6PulseLeagueMessages.es, debateMessages.es, stanceMessages.es, resultsMessages.es, activeAiMessages.es, teamMessages.es, responseMessages.es, groupMessages.es, reliableCoreMessages.es, debateLanguageMessages.es, polishMessages.es) as LocaleMessages,
+  it: Object.assign({}, it, phase2Messages.it, phase3Messages.it, phase3OnboardingMessages.it, phase4OnboardingMessages.it, phase5ProfileMessages.it, phase6PulseLeagueMessages.it, debateMessages.it, stanceMessages.it, resultsMessages.it, activeAiMessages.it, teamMessages.it, responseMessages.it, groupMessages.it, reliableCoreMessages.it, debateLanguageMessages.it, polishMessages.it) as LocaleMessages,
 }
 Object.assign(locales.en, authMessages.en)
 Object.assign(locales.de, authMessages.de)
@@ -41,6 +45,11 @@ Object.assign(locales.de, friendsMessages.de)
 Object.assign(locales.fr, friendsMessages.fr)
 Object.assign(locales.es, friendsMessages.es)
 Object.assign(locales.it, friendsMessages.it)
+Object.assign(locales.en, debateRecoveryMessages.en)
+Object.assign(locales.de, debateRecoveryMessages.de)
+Object.assign(locales.fr, debateRecoveryMessages.fr)
+Object.assign(locales.es, debateRecoveryMessages.es)
+Object.assign(locales.it, debateRecoveryMessages.it)
 export const localeMessages = locales
 
 export function isLanguage(value: unknown): value is Language { return value === 'en' || value === 'de' || value === 'fr' || value === 'es' || value === 'it' }

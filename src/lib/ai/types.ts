@@ -100,6 +100,8 @@ export type AiProvider = {
   evaluate: (messages: AiMessage[], modelId: string, context?: { debateId?: string; requestId?: string }) => Promise<AiEvaluation>
 }
 
+import type { DebateLanguageCode, DebateLanguageMode } from '../../domain'
+
 export type AiStartConfig = {
   opponent: ResolvedOpponent
   difficulty: AiDifficulty
@@ -110,4 +112,6 @@ export type AiStartConfig = {
   userSide: string
   aiSide: string
   customMotion: string | null
+  debateLanguageMode: DebateLanguageMode
+  debateLanguageCode?: DebateLanguageCode
 }

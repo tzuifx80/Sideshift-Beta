@@ -5,6 +5,9 @@ import type { WorldPulseSnapshot } from './worldPulse'
 export type Mode = 'classic' | 'sideswitch' | 'blindside' | 'commonground'
 export type Stance = -2 | -1 | 0 | 1 | 2
 export type Language = 'en' | 'de' | 'fr' | 'es' | 'it'
+/** BCP-47 debate language code — may extend beyond UI locales. */
+export type DebateLanguageCode = string
+export type DebateLanguageMode = 'auto' | 'explicit'
 export type AiDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert'
 export type AiRoundLength = 'quick' | 'standard' | 'deep'
 export type AiQuality = 'fast' | 'balanced' | 'maximum'
@@ -25,7 +28,19 @@ export type AiEvaluationData = {
   concession?: 'user' | 'opponent' | 'both' | 'none'
 }
 
-export type AiTurnData = { role: 'user' | 'opponent'; round: number; content: string; interrupted?: boolean }
+export type AiTurnData = {
+  role: 'user' | 'opponent'
+  round: number
+  content: string
+  interrupted?: boolean
+  engineMode?: 'enhanced' | 'reliable'
+  engineVersion?: string
+  tactic?: string
+  requestId?: string
+  fallbackReason?: string
+  latencyMs?: number
+  generatedAt?: string
+}
 
 export type AiDebateData = {
   opponentId: string
@@ -40,6 +55,10 @@ export type AiDebateData = {
   userSide: string
   aiSide: string
   customMotion: string | null
+  /** Locked BCP-47 debate language for prompts and evaluation. */
+  debateLanguageCode?: DebateLanguageCode
+  debateLanguageMode?: DebateLanguageMode
+  debateLanguageLocked?: boolean
   transcript: AiTurnData[]
   partialResponse: string
   interrupted: boolean
@@ -102,6 +121,9 @@ export type ResultData = {
     customMotion?: string | null
     evaluationAvailable: boolean
     evaluation?: AiEvaluationData
+    evaluationDisclaimer?: string
+    engineMode?: 'enhanced' | 'reliable'
+    engineVersion?: string
   }
 }
 
@@ -117,7 +139,7 @@ export type DebateSnapshot = {
   responses: Record<number, string>
   opponentMessages: Record<number, string>
   assignedSide: string
-  language: Language
+  language: DebateLanguageCode
   status: 'active' | 'completed'
   updatedAt: string
   worldPulse?: WorldPulseSnapshot

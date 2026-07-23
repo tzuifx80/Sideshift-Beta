@@ -1,5 +1,6 @@
-import { takeText, type AiDebateData, type DebateSnapshot, type Language, type ResultData, type Take } from './domain'
+import { takeText, type AiDebateData, type DebateLanguageCode, type DebateSnapshot, type Language, type ResultData, type Take } from './domain'
 import type { AppRepository } from './data/repository'
+import { consumeLastEvaluationDisclaimer } from './lib/debateEngine/context'
 import type { AiEvaluation, AiStartConfig } from './lib/ai/types'
 
 export function createAiDebateCompletionGuard() {
@@ -46,9 +47,12 @@ export function buildAiDebateCompletionPayload(input: {
   aiTake: Take
   aiConfig: AiStartConfig
   aiSnapshot: AiDebateData
-  language: Language
+  language: DebateLanguageCode
   makeId: () => string
   now?: string
+  evaluationDisclaimer?: string
+  engineMode?: 'enhanced' | 'reliable'
+  engineVersion?: string
 }): { completedDebate: DebateSnapshot; result: ResultData; completedSnapshot: AiDebateData } {
   const now = input.now || new Date().toISOString()
   const scoreRows = [
@@ -91,6 +95,9 @@ export function buildAiDebateCompletionPayload(input: {
       customMotion: input.aiSnapshot.customMotion,
       evaluationAvailable: true,
       evaluation: input.evaluation,
+      evaluationDisclaimer: input.evaluationDisclaimer,
+      engineMode: input.engineMode,
+      engineVersion: input.engineVersion,
     },
   }
   const completedDebate: DebateSnapshot = {
@@ -119,7 +126,7 @@ export type RunAiDebateCompletionInput = {
   aiTake: Take
   aiConfig: AiStartConfig
   aiSnapshot: AiDebateData
-  language: Language
+  language: DebateLanguageCode
   repository: AppRepository
   userId: string
   guard: ReturnType<typeof createAiDebateCompletionGuard>
@@ -135,6 +142,7 @@ export async function runAiDebateCompletion(input: RunAiDebateCompletionInput): 
   if (!input.guard.tryBegin(input.debateId)) return { status: 'aborted' }
   try {
     const evaluation = await input.evaluate()
+    const opponentTurn = [...input.transcript].reverse().find(turn => turn.role === 'opponent')
     const payload = buildAiDebateCompletionPayload({
       debateId: input.debateId,
       transcript: input.transcript,
@@ -144,6 +152,9 @@ export async function runAiDebateCompletion(input: RunAiDebateCompletionInput): 
       aiSnapshot: input.aiSnapshot,
       language: input.language,
       makeId: input.makeId,
+      evaluationDisclaimer: consumeLastEvaluationDisclaimer() || undefined,
+      engineMode: opponentTurn?.engineMode,
+      engineVersion: opponentTurn?.engineVersion,
     })
     await input.repository.saveDebateWithResult(input.userId, payload.completedDebate, payload.result)
     return { status: 'success', ...payload }

@@ -38,6 +38,8 @@ const aiConfig = {
   userSide: aiTake.supportLabel,
   aiSide: aiTake.opposeLabel,
   customMotion: null,
+  debateLanguageMode: 'explicit',
+  debateLanguageCode: 'en',
 } satisfies AiStartConfig
 const aiSnapshot: AiDebateData = {
   opponentId: 'sideshift-basic',

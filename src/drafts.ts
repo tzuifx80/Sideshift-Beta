@@ -1,6 +1,8 @@
 const DRAFT_PREFIX = 'sideshift-draft-v1:'
 const AI_SETUP_KEY = 'sideshift-ai-setup-v1'
 
+import type { DebateLanguageMode } from './domain'
+
 export type AiSetupDraft = {
   takeId: string
   selectedId: string
@@ -12,6 +14,8 @@ export type AiSetupDraft = {
   exactModelId: string | null
   userSide: string
   customMotion: string
+  debateLanguageMode?: DebateLanguageMode
+  debateLanguageCode?: string
 }
 
 function keyFor(key: string): string {

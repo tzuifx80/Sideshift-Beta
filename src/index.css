@@ -565,6 +565,7 @@ html.reduced-motion *, html.reduced-motion *::before, html.reduced-motion *::aft
 .ai-connection-copy p, .ai-connection-copy small { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .ai-connection-copy small { font-size: 10px; }
 .ai-status-pill { display: inline-flex; align-items: center; align-self: center; min-height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary); background: var(--background); font-family: 'DM Mono'; font-size: 9px; }
+.ai-engine-status-pill { display: inline-flex; align-items: center; align-self: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary); background: color-mix(in srgb, var(--background) 92%, var(--accent) 8%); font-family: 'DM Mono'; font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; }
 .ai-status-pill.connected { border-color: var(--success); color: var(--success); }
 .ai-connection-error { grid-column: 2 / -1; margin: 0; }
 .ai-allowance-card { display: grid; grid-template-columns: 1fr auto; gap: 4px 20px; align-items: center; margin-top: 12px; padding: 13px 16px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); background: var(--surface-subtle); font-size: 10px; }
@@ -632,6 +633,8 @@ html.reduced-motion *, html.reduced-motion *::before, html.reduced-motion *::aft
 .ai-waiting-state strong { color: var(--text-primary); font-family: 'Space Grotesk'; font-size: 16px; }
 .ai-waiting-state small { font-size: 10px; }
 .ai-response-box, .ai-complete-card, .ai-interrupted { margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.app-shell.debate-focus .mobile-nav { display: none; }
+.app-shell.debate-focus .main-content { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 .ai-response-box textarea { width: 100%; min-height: 120px; padding: 2px; border: 0; outline: 0; resize: vertical; color: var(--text-primary); background: transparent; font-size: 13px; line-height: 1.55; }
 .ai-response-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 11px; border-top: 1px solid var(--border); }
 .ai-response-footer small, .ai-complete-card span, .ai-interrupted span { color: var(--text-secondary); font-size: 9px; line-height: 1.45; }
@@ -707,6 +710,7 @@ html.reduced-motion *, html.reduced-motion *::before, html.reduced-motion *::aft
   .ai-setup-footer, .ai-debate-top { align-items: stretch; flex-direction: column; }
   .ai-setup-footer .button { width: 100%; }
   .ai-debate-top .ai-model-label { margin-left: 0; text-align: left; }
+  .ai-response-box { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 2; box-shadow: 0 -8px 24px rgba(24, 20, 16, 0.08); }
   .ai-interrupted { grid-template-columns: 1fr; }
   .ai-interrupted span, .ai-interrupted .button { grid-column: auto; grid-row: auto; }
   .ai-result-actions { align-items: stretch; flex-direction: column; }
@@ -860,4 +864,38 @@ input, textarea, select { font-size: 16px; }
   .profile-heading-actions .button { width: 100%; }
   .profile-identity-addendum { align-items: stretch; flex-direction: column; }
   .profile-identity-addendum .button { width: 100%; }
+}
+
+.debate-language-control { display: grid; gap: 10px; }
+.debate-language-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.debate-language-options button { min-height: 42px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); text-align: left; }
+.debate-language-options button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.debate-language-options button strong { display: block; font-size: 12px; }
+.debate-language-options button small { display: block; color: var(--text-secondary); font-size: 10px; }
+.debate-language-dialog { display: grid; gap: 10px; margin-top: 10px; padding: 12px; }
+.debate-language-dialog-list { display: grid; gap: 6px; max-height: 220px; overflow: auto; }
+.debate-language-dialog-list button { display: grid; gap: 2px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-subtle); text-align: left; }
+.debate-language-status { color: var(--text-secondary); font-family: 'DM Mono'; font-size: 9px; }
+.ai-turn p[dir='auto'], .ai-response-box textarea[dir='auto'], .settings-textarea[dir='auto'] { unicode-bidi: plaintext; text-align: start; }
+
+.home-eyebrow-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.beta-badge .tag { font-size: 9px; letter-spacing: .7px; }
+.beta-welcome-note { margin-bottom: 18px; padding: 18px 20px; }
+.beta-welcome-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.beta-welcome-list { margin: 12px 0 16px; padding-left: 18px; color: var(--ink-muted); font-size: 13px; line-height: 1.5; }
+.beta-welcome-list li + li { margin-top: 6px; }
+.beta-welcome-dismiss { margin-top: 4px; }
+.coaching-card { display: grid; gap: 10px; grid-column: 1 / -1; }
+.coaching-card p { margin: 0; font-size: 14px; line-height: 1.55; }
+.recent-card-button { width: 100%; text-align: left; cursor: pointer; border: 1px solid transparent; font: inherit; color: inherit; }
+.recent-card-button:hover, .recent-card-button:focus-visible { border-color: var(--line); box-shadow: 0 12px 28px rgba(34, 38, 62, .08); transform: translateY(-1px); }
+.recent-card-button:active { transform: translateY(0); }
+.argument-hint-panel { margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); }
+.argument-hint-panel summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink); }
+.argument-hint-panel p { margin: 10px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+.ai-your-turn-prompt { margin: 0 0 10px; color: var(--coral-dark); font-size: 12px; font-weight: 700; }
+.explore-filter-empty { margin-top: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .recent-card-button:hover, .recent-card-button:focus-visible { transform: none; }
+  .argument-hint-panel summary { scroll-margin-top: 0; }
 }

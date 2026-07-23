@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Button, Icon, Logo, Tag, type IconName } from './components/SideShiftUI'
+import { BetaFeedbackForm } from './components/BetaFeedbackForm'
+import { BetaWelcomeNote } from './components/BetaWelcomeNote'
 import { AvatarPhotoPicker } from './components/AvatarPhotoPicker'
 import { ProfileAvatar } from './components/ProfileAvatar'
 import { getProfileAvatarSnapshot, publishProfileAvatar, subscribeToProfileAvatar } from './profileAvatarStore'
@@ -28,17 +30,21 @@ import { aiDebateMotion, createAiDebateCompletionGuard, runAiDebateCompletion } 
 import { createMockAiProvider, createUnavailableAiProvider } from './lib/ai/provider'
 import { getOpponent } from './lib/ai/opponents'
 import { createBasicAiProvider } from './lib/ai/basicProvider'
+import { createDebateEngineProvider, setActiveDebateEngineContext } from './lib/debateEngine'
+import { debateLanguageDisplayName, normalizeDebateLanguageCode, resolveDebateLanguage } from './lib/debateLanguage'
 import { aiRuntimeLabel, createAiRuntimeSnapshot } from './lib/ai/runtimeStatus'
 import type { AiFeedbackType, AiModel, AiProvider, AiRuntimeSnapshot, AiStartConfig, ResolvedOpponent } from './lib/ai/types'
 import { useAuth } from './auth/useAuth'
-import type { AppRepository, BetaFeedbackCategory, BetaFeedbackInput, ReportInput } from './data/repository'
+import type { AppRepository, BetaFeedbackInput, ReportInput } from './data/repository'
 import type { UserPreferences, UserProfile, UserStatsSnapshot } from './data/types'
 import { accentThemes, appearanceLabels, avatarPresets, defaultProfileFieldVisibility, normalizePreferences, normalizeProfile, textSizeLabels } from './profile'
 import { calculatePersonalStats, type PersonalStats } from './stats'
 import { applyTheme } from './theme'
 import { setAnalyticsAccessToken, trackEvent } from './analytics'
 import { registerServiceWorker, useInstallPrompt, useOnlineStatus, useServiceWorkerUpdate } from './pwa'
-import { clearAiSetupDraft, hasArgumentDraft, loadAiSetupDraft } from './drafts'
+import { clearAiSetupDraft, clearArgumentDraft, hasArgumentDraft, loadAiSetupDraft } from './drafts'
+import { DebateRecoveryScreen } from './components/DebateRecoveryScreen'
+import { assessDebateRecovery, resolveDebateTake, type DebateRecoveryIssue } from './lib/debateRecovery'
 import { FirstUseGuide, hasSeenFirstUseGuide, markFirstUseGuideSeen } from './FirstUseGuide'
 import { initializeCapacitorBridge } from './capacitor'
 import { Groups } from './Groups'
@@ -61,7 +67,7 @@ const FriendClashSetup = lazy(async () => ({ default: (await import('./features/
 const FriendClashRecipient = lazy(async () => ({ default: (await import('./features/friend-clash/ChallengeRecipient')).ChallengeRecipient }))
 const WorldPulseAdmin = lazy(async () => ({ default: (await import('./features/world-pulse/WorldPulseAdmin')).WorldPulseAdmin }))
 
-type Screen = 'home' | 'explore' | 'friends' | 'groups' | 'team' | 'debateChoice' | 'debate' | 'results' | 'clash' | 'profile' | 'profileView' | 'settings' | 'aiSetup' | 'aiDebate' | 'aiResults'
+type Screen = 'home' | 'explore' | 'friends' | 'groups' | 'team' | 'debateChoice' | 'debate' | 'results' | 'clash' | 'profile' | 'profileView' | 'settings' | 'aiSetup' | 'aiDebate' | 'aiResults' | 'debateRecovery'
 type AiMode = AiRuntimeSnapshot['primary']
 type BeginHandler = (mode: Mode, take?: Take) => void | Promise<void>
 
@@ -84,8 +90,9 @@ function aiRoundLimit(roundLength: AiStartConfig['roundLength']): number {
   return roundLength === 'quick' ? 3 : roundLength === 'deep' ? 6 : 4
 }
 
-function privateTake(motion: string, baseTake: Take): Take {
-  return { ...baseTake, id: `private-${makeUuid()}`, statement: motion, statementDe: motion, context: 'Private motion created only for this debate.', contextDe: 'Private motion created only for this debate.' }
+function privateTake(motion: string, baseTake: Take, takeId?: string): Take {
+  const stableId = takeId?.startsWith('private-') ? takeId : `private-${makeUuid()}`
+  return { ...baseTake, id: stableId, statement: motion, statementDe: motion, context: 'Private motion created only for this debate.', contextDe: 'Private motion created only for this debate.' }
 }
 
 function hydratedAiConfig(ai: AiDebateData): AiStartConfig | null {
@@ -93,7 +100,7 @@ function hydratedAiConfig(ai: AiDebateData): AiStartConfig | null {
   if (!opponent) return null
   const model: AiModel = { id: ai.modelId, provider: opponent.family, name: ai.modelId, aliases: [], context: null, maxTokens: opponent.maxResponseTokens, inputCost: null, outputCost: null, supportsText: true, supportsChat: true, supportsStreaming: true, isLegacy: false, raw: {} }
   const resolved: ResolvedOpponent = { ...opponent, available: true, model, models: [model], selection: ai.modelSelection || 'exact' }
-  return { opponent: resolved, difficulty: ai.difficulty, roundLength: ai.roundLength, quality: ai.quality || 'balanced', responseLength: ai.responseLength || 'standard', modelSelection: ai.modelSelection || 'exact', userSide: ai.userSide, aiSide: ai.aiSide, customMotion: ai.customMotion }
+  return { opponent: resolved, difficulty: ai.difficulty, roundLength: ai.roundLength, quality: ai.quality || 'balanced', responseLength: ai.responseLength || 'standard', modelSelection: ai.modelSelection || 'exact', userSide: ai.userSide, aiSide: ai.aiSide, customMotion: ai.customMotion, debateLanguageMode: ai.debateLanguageMode || 'explicit', debateLanguageCode: ai.debateLanguageCode }
 }
 
 function hydratedResultAiConfig(result: ResultData): AiStartConfig | null {
@@ -103,7 +110,7 @@ function hydratedResultAiConfig(result: ResultData): AiStartConfig | null {
   const model: AiModel = { id: result.ai.modelId, provider: opponent.family, name: result.ai.modelId, aliases: [], context: null, maxTokens: opponent.maxResponseTokens, inputCost: null, outputCost: null, supportsText: true, supportsChat: true, supportsStreaming: true, isLegacy: false, raw: {} }
   const resolved: ResolvedOpponent = { ...opponent, available: true, model, models: [model], selection: result.ai.modelSelection || 'exact' }
   const aiSide = result.assignedSide === result.take.supportLabel ? result.take.opposeLabel : result.take.supportLabel
-  return { opponent: resolved, difficulty: result.ai.difficulty, roundLength: result.ai.roundLength, quality: result.ai.quality || 'balanced', responseLength: result.ai.responseLength || 'standard', modelSelection: result.ai.modelSelection || 'exact', userSide: result.assignedSide, aiSide, customMotion: result.ai.customMotion || null }
+  return { opponent: resolved, difficulty: result.ai.difficulty, roundLength: result.ai.roundLength, quality: result.ai.quality || 'balanced', responseLength: result.ai.responseLength || 'standard', modelSelection: result.ai.modelSelection || 'exact', userSide: result.assignedSide, aiSide, customMotion: result.ai.customMotion || null, debateLanguageMode: 'explicit' }
 }
 
 function OfflineBanner({ online, language }: { online: boolean; language: Language }) {
@@ -169,6 +176,15 @@ function MobileOnboarding({ userId, language, initialProgress, onProgress, onCom
   const [error, setError] = useState('')
   const browserOnline = useOnlineStatus()
   const isOnline = online ?? browserOnline
+  useEffect(() => {
+    function handleNativeBack(event: Event) {
+      if (step === 0) return
+      event.preventDefault()
+      void move(step - 1)
+    }
+    window.addEventListener('sideshift-native-back', handleNativeBack)
+    return () => window.removeEventListener('sideshift-native-back', handleNativeBack)
+  }, [step])
   useEffect(() => { window.localStorage.setItem(key, serializeOnboardingProgress({ step, name, selected, goal })) }, [goal, key, name, selected, step])
   async function move(next: number) { setError(''); setStep(next); try { await onProgress?.(next, goal, name, selected) } catch (caught) { setError(caught instanceof Error ? caught.message : t('onboarding.saveError')) } }
   async function finish() {
@@ -215,17 +231,17 @@ function Sidebar({ screen, name, historyCount, onNavigate, onOpenProfile, onNoti
   return <aside className="sidebar"><div className="sidebar-brand"><Logo /></div><div className="sidebar-section-label">YOUR SPACE</div><nav className="sidebar-nav">{[{ id: 'home' as Screen, label: 'Today', icon: 'home' as IconName }, { id: 'explore' as Screen, label: 'Explore takes', icon: 'layers' as IconName }, { id: 'results' as Screen, label: 'Your shifts', icon: 'spark' as IconName }].map(item => <button type="button" key={item.id} className={`nav-item ${screen === item.id ? 'active' : ''}`} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={18} /><span>{item.label}</span>{item.id === 'results' && historyCount > 0 && <span className="nav-count">{historyCount}</span>}</button>)}</nav><div className="sidebar-section-label sidebar-modes-label">PLAY MODES</div><button type="button" className="nav-item" onClick={() => onNavigate('home')}><span className="mode-dot dot-coral" /><span>Classic</span></button><button type="button" className="nav-item" onClick={() => onNavigate('home')}><span className="mode-dot dot-lavender" /><span>SideSwitch</span><Tag tone="new">NEW</Tag></button><button type="button" className="nav-item" onClick={() => onNavigate('clash')}><span className="mode-dot dot-yellow" /><span>Friend Clash</span></button><div className="sidebar-spacer" /><div className="streak-card"><div className="streak-top"><span className="streak-icon"><Icon name="flame" size={16} /></span><span>{historyCount ? `${Math.min(historyCount, 3)} day streak` : 'Start your streak'}</span></div><div className="streak-dots"><i className={historyCount ? 'filled' : ''} /><i className={historyCount > 1 ? 'filled' : ''} /><i className={historyCount > 2 ? 'filled' : ''} /><i /><i /><i /><i /></div><p>Keep your thinking<br />in motion.</p></div><button type="button" className="profile-mini" onClick={onOpenProfile}><span className="avatar avatar-coral">{name.slice(0, 1).toUpperCase()}</span><span className="profile-mini-copy"><strong>{name}</strong><small>Curious challenger</small></span><span aria-label="Profile options" onClick={event => { event.stopPropagation(); onNotify('Profile settings are coming after beta.') }}><Icon name="more" size={16} /></span></button></aside>
 }
 
-function TopBar({ onLanguage, language, aiMode, onProfile, onNotify }: { onLanguage: () => void; language: Language; aiMode: AiMode; onProfile: () => void; onNotify: (message: string) => void }) {
+function TopBar({ onLanguage, language, aiMode, onProfile, onHelp, onNotify }: { onLanguage: () => void; language: Language; aiMode: AiMode; onProfile: () => void; onHelp: () => void; onNotify: (message: string) => void }) {
   const t = useTranslations(language)
   const avatar = useSyncExternalStore(subscribeToProfileAvatar, getProfileAvatarSnapshot, getProfileAvatarSnapshot)
-  return <header className="topbar"><div className="mobile-logo"><Logo compact /></div><div className="breadcrumb"><span>{t('nav.home')}</span><span className="breadcrumb-dot">·</span><strong>{t('common.private')}</strong></div><div className="topbar-actions"><button type="button" className="language-button" onClick={onLanguage} aria-label={t('shell.switchLanguage', { language: localeLabels[language] })}><Icon name="globe" size={15} /> {language.toUpperCase()} <Icon name="chevron" size={12} /></button><button type="button" className="icon-button" aria-label={t('shell.help')} onClick={() => onNotify(t('shell.helpMessage'))}><Icon name="help" size={18} /></button><button type="button" className="icon-button notification-button" aria-label={t('shell.notifications')} onClick={() => onNotify(t('shell.noNotifications'))}><Icon name="spark" size={17} /><i /></button><button type="button" className="top-avatar" onClick={onProfile} aria-label={t('common.viewProfile')}>{avatar ? <ProfileAvatar profile={avatar.profile} repository={avatar.repository} userId={avatar.userId} revision={avatar.revision} /> : 'A'}</button></div></header>
+  return <header className="topbar"><div className="mobile-logo"><Logo compact /></div><div className="breadcrumb"><span>{t('nav.home')}</span><span className="breadcrumb-dot">·</span><strong>{t('common.private')}</strong></div><div className="topbar-actions"><button type="button" className="language-button" onClick={onLanguage} aria-label={t('shell.switchLanguage', { language: localeLabels[language] })}><Icon name="globe" size={15} /> {language.toUpperCase()} <Icon name="chevron" size={12} /></button><button type="button" className="icon-button" aria-label={t('shell.help')} onClick={onHelp}><Icon name="help" size={18} /></button><button type="button" className="icon-button notification-button" aria-label={t('shell.notifications')} onClick={() => onNotify(t('shell.noNotifications'))}><Icon name="spark" size={17} /><i /></button><button type="button" className="top-avatar" onClick={onProfile} aria-label={t('common.viewProfile')}>{avatar ? <ProfileAvatar profile={avatar.profile} repository={avatar.repository} userId={avatar.userId} revision={avatar.revision} /> : 'A'}</button></div></header>
 }
 
-function AppShellV2({ children, screen, name, historyCount, onNavigate, onLanguage, language, aiMode, onNotify, online, onDelete, hasUnsavedDraft }: { children: ReactNode; screen: Screen; name: string; historyCount: number; onNavigate: (screen: Screen) => void; onLanguage: () => void; language: Language; aiMode: AiMode; onNotify: (message: string) => void; online?: boolean; onDelete?: () => void; hasUnsavedDraft?: boolean }) {
+function AppShellV2({ children, screen, name, historyCount, onNavigate, onLanguage, language, aiMode, onNotify, onHelp, online, onDelete, hasUnsavedDraft, debateFocus = false }: { children: ReactNode; screen: Screen; name: string; historyCount: number; onNavigate: (screen: Screen) => void; onLanguage: () => void; language: Language; aiMode: AiMode; onNotify: (message: string) => void; onHelp: () => void; online?: boolean; onDelete?: () => void; hasUnsavedDraft?: boolean; debateFocus?: boolean }) {
   const t = useTranslations(language)
   const navItems = [{ id: 'home' as Screen, label: t('nav.home'), icon: 'home' as IconName }, { id: 'explore' as Screen, label: t('nav.explore'), icon: 'layers' as IconName }, { id: 'friends' as Screen, label: t('friends.title'), icon: 'person' as IconName }, { id: 'groups' as Screen, label: t('nav.groups'), icon: 'users' as IconName }, { id: 'profile' as Screen, label: t('nav.profile'), icon: 'person' as IconName }]
   const update = useServiceWorkerUpdate()
-  return <div className="app-shell"><aside className="sidebar"><div className="sidebar-brand"><Logo /></div><div className="sidebar-section-label">{t('shell.yourSpace')}</div><nav className="sidebar-nav" aria-label={t('nav.home')}>{navItems.map(item => <button type="button" key={item.id} className={`nav-item ${screen === item.id ? 'active' : ''}`} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={18} /><span>{item.label}</span>{item.id === 'profile' && historyCount > 0 && <span className="nav-count">{historyCount}</span>}</button>)}</nav><div className="sidebar-section-label sidebar-modes-label">{t('shell.playModes')}</div><button type="button" className="nav-item" onClick={() => onNavigate('home')}><span className="mode-dot dot-coral" /><span>{t('shell.classic')}</span></button><button type="button" className="nav-item" onClick={() => onNavigate('home')}><span className="mode-dot dot-lavender" /><span>{t('shell.sideSwitch')}</span><Tag tone="new">{t('shell.new')}</Tag></button><button type="button" className="nav-item" onClick={() => onNavigate('clash')}><span className="mode-dot dot-yellow" /><span>{t('shell.personChallenge')}</span></button><button type="button" className="nav-item" onClick={() => onNavigate('team')}><span className="mode-dot dot-mint" /><span>{t('shell.teamDebate')}</span><Tag tone="new">{t('shell.new')}</Tag></button><div className="sidebar-spacer" /><div className="streak-card"><div className="streak-top"><span className="streak-icon"><Icon name="flame" size={16} /></span><span>{historyCount ? t('shell.keepStreak') : t('shell.startStreak')}</span></div><p>{t('shell.streakBody')}</p></div><button type="button" className="profile-mini" onClick={() => onNavigate('profile')}><span className="avatar avatar-coral">{name.slice(0, 1).toUpperCase()}</span><span className="profile-mini-copy"><strong>{name || t('common.viewProfile')}</strong><small>{t('shell.privateByDefault')}</small></span><Icon name="chevron" size={15} /></button></aside><div className="main-column"><TopBar onLanguage={onLanguage} language={language} aiMode={aiMode} onProfile={() => onNavigate('profile')} onNotify={onNotify} /><InstallControl onNotify={onNotify} /><OfflineBanner online={online ?? true} language={language} />{update.available && <div className="update-banner" role="status"><span>{t('shell.updateReady')}</span><button type="button" className="text-link" onClick={() => { if (hasUnsavedDraft) onNotify(t('common.save')); else update.apply() }}>{t('shell.updateReady')}</button></div>}<main className="main-content">{children}</main><nav className="mobile-nav" aria-label={t('nav.home')}>{navItems.map(item => <button type="button" key={item.id} className={screen === item.id ? 'active' : ''} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={19} /><span>{item.label}</span></button>)}</nav><footer className="app-footer"><a href="/privacy">{t('shell.privacy')}</a><a href="/terms">{t('shell.betaTerms')}</a><a href="/community">{t('shell.communityRules')}</a>{onDelete && <button type="button" className="delete-data-button" onClick={onDelete}>{t('shell.deleteData')}</button>}</footer></div></div>
+  return <div className={`app-shell${debateFocus ? ' debate-focus' : ''}`}><aside className="sidebar"><div className="sidebar-brand"><Logo /></div><div className="sidebar-section-label">{t('shell.yourSpace')}</div><nav className="sidebar-nav" aria-label={t('nav.home')}>{navItems.map(item => <button type="button" key={item.id} className={`nav-item ${screen === item.id ? 'active' : ''}`} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={18} /><span>{item.label}</span>{item.id === 'profile' && historyCount > 0 && <span className="nav-count">{historyCount}</span>}</button>)}</nav><div className="sidebar-section-label sidebar-modes-label">{t('shell.playModes')}</div><button type="button" className="nav-item" onClick={() => onNavigate('home')}><span className="mode-dot dot-coral" /><span>{t('shell.classic')}</span></button><button type="button" className="nav-item" onClick={() => onNavigate('home')}><span className="mode-dot dot-lavender" /><span>{t('shell.sideSwitch')}</span><Tag tone="new">{t('shell.new')}</Tag></button><button type="button" className="nav-item" onClick={() => onNavigate('clash')}><span className="mode-dot dot-yellow" /><span>{t('shell.personChallenge')}</span></button><button type="button" className="nav-item" onClick={() => onNavigate('team')}><span className="mode-dot dot-mint" /><span>{t('shell.teamDebate')}</span><Tag tone="new">{t('shell.new')}</Tag></button><div className="sidebar-spacer" /><div className="streak-card"><div className="streak-top"><span className="streak-icon"><Icon name="flame" size={16} /></span><span>{historyCount ? t('shell.keepStreak') : t('shell.startStreak')}</span></div><p>{t('shell.streakBody')}</p></div><button type="button" className="profile-mini" onClick={() => onNavigate('profile')}><span className="avatar avatar-coral">{name.slice(0, 1).toUpperCase()}</span><span className="profile-mini-copy"><strong>{name || t('common.viewProfile')}</strong><small>{t('shell.privateByDefault')}</small></span><Icon name="chevron" size={15} /></button></aside><div className="main-column"><TopBar onLanguage={onLanguage} language={language} aiMode={aiMode} onProfile={() => onNavigate('profile')} onHelp={onHelp} onNotify={onNotify} /><InstallControl onNotify={onNotify} /><OfflineBanner online={online ?? true} language={language} />{update.available && <div className="update-banner" role="status"><span>{t('shell.updateReady')}</span><button type="button" className="text-link" onClick={() => { if (hasUnsavedDraft) onNotify(t('common.save')); else update.apply() }}>{t('shell.updateReady')}</button></div>}<main className="main-content">{children}</main><nav className="mobile-nav" aria-label={t('nav.home')}>{navItems.map(item => <button type="button" key={item.id} className={screen === item.id ? 'active' : ''} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={19} /><span>{item.label}</span></button>)}</nav><footer className="app-footer"><a href="/privacy">{t('shell.privacy')}</a><a href="/terms">{t('shell.betaTerms')}</a><a href="/community">{t('shell.communityRules')}</a>{onDelete && <button type="button" className="delete-data-button" onClick={onDelete}>{t('shell.deleteData')}</button>}</footer></div></div>
 }
 
 function TakeCard({ take, onBegin, onChooseDebate, featured = false, language }: { take: Take; onBegin: BeginHandler; onChooseDebate?: (take: Take) => void; featured?: boolean; language: Language }) {
@@ -235,9 +251,12 @@ function TakeCard({ take, onBegin, onChooseDebate, featured = false, language }:
   return <article className={`take-card card-surface ${featured ? 'featured' : ''}`}><div className={`take-card-color color-${take.color}`} aria-hidden="true" /><div className="take-card-body"><div className="take-card-meta"><Tag tone={take.categoryClass.replace('category-', '')}>{text.category}</Tag><span className="take-card-index">{String(takes.findIndex(item => item.id === take.id) + 1).padStart(2, '0')}</span><span><Icon name="clock" size={13} /> {take.time}</span></div><h3>{text.statement}</h3>{text.sourceLanguage && <small className="take-source-note">{t('take.sourceEnglish')}</small>}<div className="take-card-foot"><span className="difficulty"><i className={`difficulty-dot difficulty-${take.difficulty.toLowerCase()}`} /> {t(difficultyKey)}</span><button type="button" className="round-arrow" aria-label={`${t('take.start')}: ${text.statement}`} onClick={() => onChooseDebate ? onChooseDebate(take) : onBegin('classic', take)}><Icon name="arrow" size={15} /></button></div></div></article>
 }
 
-function RecentShift({ result, language }: { result: ResultData; language: Language }) {
+function RecentShift({ result, language, onViewResult }: { result: ResultData; language: Language; onViewResult: (result: ResultData) => void }) {
   const text = takeText(result.take, language)
-  return <article className="recent-card card-surface"><span className="recent-icon lavender"><Icon name="spark" size={18} /></span><div><h3>{text.statement}</h3><p>{translate(language, result.mode === 'sideswitch' ? 'profile.sideSwitch' : 'profile.classic')} · {new Intl.DateTimeFormat(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'it' ? 'it-IT' : 'en-GB').format(new Date(result.completedAt))}</p></div><strong>{result.score}<small>/100</small></strong><Icon name="chevron" size={17} /></article>
+  const t = useTranslations(language)
+  const modeLabel = translate(language, result.mode === 'sideswitch' ? 'profile.sideSwitch' : 'profile.classic')
+  const dateLabel = new Intl.DateTimeFormat(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'it' ? 'it-IT' : 'en-GB').format(new Date(result.completedAt))
+  return <button type="button" className="recent-card card-surface recent-card-button" onClick={() => onViewResult(result)} aria-label={t('home.viewResult', { statement: text.statement })}><span className="recent-icon lavender"><Icon name="spark" size={18} /></span><div><h3>{text.statement}</h3><p>{modeLabel} · {dateLabel}</p></div><strong>{result.score}<small>/100</small></strong><Icon name="chevron" size={17} /></button>
 }
 
 function avatarGlyph(preset: UserProfile['avatarPreset']): ReactNode {
@@ -263,14 +282,14 @@ function StreakSummary({ stats, language }: { stats: PersonalStats; language: La
   return <div className="streak-summary card-surface"><div className="streak-summary-icon"><Icon name="flame" size={20} /></div><div><span className="eyebrow">{t('profile.currentStreak')}</span><strong>{stats.currentStreak}</strong><small>{stats.totalActiveDays} {t('profile.activeDays')} · {t('profile.bestStreak')} {stats.bestStreak}</small></div></div>
 }
 
-function PersonalHomeBase({ userName, language, interests, history, stats, activeDebate, lastResult, preferredMode, onBegin, onChooseDebate, onResume, onExplore, onClash, onProfile, onSettings, onNotify }: { userName: string; language: Language; interests: string[]; history: ResultData[]; stats: PersonalStats; activeDebate: boolean; lastResult: ResultData | null; preferredMode: Mode; onBegin: BeginHandler; onChooseDebate: (take?: Take) => void; onResume: () => void; onExplore: () => void; onClash: () => void; onProfile: () => void; onSettings: () => void; onNotify: (message: string) => void }) {
+function PersonalHomeBase({ userName, language, interests, history, stats, activeDebate, lastResult, preferredMode, onBegin, onChooseDebate, onResume, onExplore, onExploreCategory, onClash, onProfile, onSettings, onViewResult, onNotify }: { userName: string; language: Language; interests: string[]; history: ResultData[]; stats: PersonalStats; activeDebate: boolean; lastResult: ResultData | null; preferredMode: Mode; onBegin: BeginHandler; onChooseDebate: (take?: Take) => void; onResume: () => void; onExplore: () => void; onExploreCategory: (category: string) => void; onClash: () => void; onProfile: () => void; onSettings: () => void; onViewResult: (result: ResultData) => void; onNotify: (message: string) => void }) {
   const firstName = userName.split(' ')[0] || 'there'
   const t = useTranslations(language)
   const recentIds = history.map(result => result.take.id)
   const personalized = selectPersonalizedTakes(interests, recentIds, 3)
   const worldTake = takes.find(take => take.id === 'society-media-age') || takes[0]
   const worldText = takeText(worldTake, language)
-  return <div className="page home-page personal-home"><div className="page-heading home-heading"><div><span className="eyebrow">{t('home.eyebrow')}</span><h1>{t(greetingKey(), { name: firstName })}<span className="heading-period">.</span></h1><p className="muted">{t('home.valueStatement')}</p></div><div className="heading-actions"><Button variant="primary" icon="arrow" onClick={() => onChooseDebate(worldTake)}>{t('common.startDebate')}</Button><Button variant="dark" icon="plus" onClick={onClash}>{t('home.challengePerson')}</Button></div></div><section className="home-grid"><article className="world-card card-surface"><div className="world-card-main"><div className="card-topline"><Tag tone="dark">{t('home.worldTake')}</Tag><span className="card-date"><Icon name="globe" size={14} /> {t('common.global')}</span></div><div className="world-number">01</div><h2>{worldText.statement}</h2><p>{worldText.context}</p><div className="world-bottom"><div className="reaction-dots"><span className="dot-pink" /><span className="dot-purple" /><span className="dot-yellow" /><span className="dot-blue" /><small>{worldText.category} · {t('common.private')}</small></div><Button variant="dark" icon="arrow" onClick={() => onBegin(preferredMode, worldTake)}>{t('common.takeASide')}</Button></div></div><div className="world-card-art"><span className="art-label">{t('home.dailyQuestion')}</span><div className="art-orbit art-orbit-a" /><div className="art-orbit art-orbit-b" /><div className="art-word">MOVE<br /><em>A</em><br />MIND</div></div></article><aside className="home-side-stack"><StreakSummary stats={stats} language={language} />{activeDebate ? <button type="button" className="continue-card card-surface" onClick={onResume}><span className="continue-icon"><Icon name="arrow" size={18} /></span><span><span className="eyebrow">{t('home.inProgress')}</span><strong>{t('home.continueDebate')}</strong><small>{t('home.draftSaved')}</small></span><Icon name="chevron" size={17} /></button> : <div className="home-note card-surface"><Icon name="shield" size={19} /><strong>{t('common.privateByDefault')}</strong><span>{t('home.valueStatement')}</span></div>}<button type="button" className="recent-result-card card-surface" onClick={lastResult ? onProfile : onExplore}>{lastResult ? <><span className="eyebrow">{t('home.latestResult')}</span><strong>{lastResult.score}/100 {t('home.argumentScore')}</strong><small>{takeText(lastResult.take, language).category} · {translate(language, lastResult.mode === 'sideswitch' ? 'profile.sideSwitch' : 'profile.classic')}</small></> : <><span className="eyebrow">{t('home.startExploring')}</span><strong>{t('home.findDisagreement')}</strong><small>{t('home.browseTakes', { count: takes.length })}</small></>}</button></aside></section><section className="section-block"><div className="section-heading"><div><span className="eyebrow">{t('home.personalized')}</span><h2>{t('home.yourTake')}</h2></div><button type="button" className="text-link" onClick={onExplore}>{t('common.viewAll')} <Icon name="arrow" size={15} /></button></div><div className="take-row">{personalized.map((take, index) => <TakeCard key={take.id} take={take} onBegin={onBegin} featured={index === 0} language={language} />)}</div><div className="category-shortcuts"><span className="eyebrow">{t('home.categories')}</span>{(interests.length ? interests : ['Wildcards']).slice(0, 5).map(category => <button type="button" key={category} onClick={onExplore}>{localizeInterest(category, language)}</button>)}<button type="button" className="shortcut-more" onClick={onSettings}>{t('home.editInterests')} <Icon name="settings" size={13} /></button></div></section><section className="section-block lower-section"><div className="section-heading"><div><span className="eyebrow">{t('home.keepMoving')}</span><h2>{t('home.recentShifts')}</h2></div><button type="button" className="text-link" onClick={onProfile}>{t('common.viewProfile')} <Icon name="arrow" size={15} /></button></div>{history.length ? <div className="recent-grid">{history.slice(0, 2).map(result => <RecentShift key={result.id} result={result} language={language} />)}<div className="mini-stats"><div><span className="mini-stat-icon mint"><Icon name="arrowUp" size={17} /></span><strong>{stats.debatesCompleted}</strong><small>{t('home.debatesCompleted')}</small></div><div><span className="mini-stat-icon yellow"><Icon name="target" size={17} /></span><strong>{stats.averageScore}</strong><small>{t('home.averageScore')}</small></div></div></div> : <div className="empty-state card-surface"><Icon name="spark" size={20} /><strong>{t('home.firstShift')}</strong><span>{t('home.firstShiftBody')}</span></div>}</section></div>
+  return <div className="page home-page personal-home"><BetaWelcomeNote language={language} /><div className="page-heading home-heading"><div><div className="home-eyebrow-row"><span className="eyebrow">{t('home.eyebrow')}</span><span className="beta-badge"><Tag tone="coral">{t('home.betaLabel')}</Tag></span></div><h1>{t(greetingKey(), { name: firstName })}<span className="heading-period">.</span></h1><p className="muted">{t('home.valueStatement')}</p></div><div className="heading-actions"><Button variant="primary" icon="arrow" onClick={() => onChooseDebate(worldTake)}>{t('home.debateNow')}</Button><Button variant="dark" icon="plus" onClick={onClash}>{t('home.challengePerson')}</Button></div></div><section className="home-grid"><article className="world-card card-surface"><div className="world-card-main"><div className="card-topline"><Tag tone="dark">{t('home.worldTake')}</Tag><span className="card-date"><Icon name="globe" size={14} /> {t('common.global')}</span></div><div className="world-number">01</div><h2>{worldText.statement}</h2><p>{worldText.context}</p><div className="world-bottom"><div className="reaction-dots"><span className="dot-pink" /><span className="dot-purple" /><span className="dot-yellow" /><span className="dot-blue" /><small>{worldText.category} · {t('common.private')}</small></div><Button variant="dark" icon="arrow" onClick={() => onBegin(preferredMode, worldTake)}>{t('common.takeASide')}</Button></div></div><div className="world-card-art"><span className="art-label">{t('home.dailyQuestion')}</span><div className="art-orbit art-orbit-a" /><div className="art-orbit art-orbit-b" /><div className="art-word">MOVE<br /><em>A</em><br />MIND</div></div></article><aside className="home-side-stack"><StreakSummary stats={stats} language={language} />{activeDebate ? <button type="button" className="continue-card card-surface" onClick={onResume}><span className="continue-icon"><Icon name="arrow" size={18} /></span><span><span className="eyebrow">{t('home.inProgress')}</span><strong>{t('home.continueDebate')}</strong><small>{t('home.draftSaved')}</small></span><Icon name="chevron" size={17} /></button> : <div className="home-note card-surface"><Icon name="shield" size={19} /><strong>{t('common.privateByDefault')}</strong><span>{t('home.valueStatement')}</span></div>}<button type="button" className="recent-result-card card-surface" onClick={lastResult ? onProfile : onExplore}>{lastResult ? <><span className="eyebrow">{t('home.latestResult')}</span><strong>{lastResult.score}/100 {t('home.argumentScore')}</strong><small>{takeText(lastResult.take, language).category} · {translate(language, lastResult.mode === 'sideswitch' ? 'profile.sideSwitch' : 'profile.classic')}</small></> : <><span className="eyebrow">{t('home.startExploring')}</span><strong>{t('home.findDisagreement')}</strong><small>{t('home.browseTakes', { count: takes.length })}</small></>}</button></aside></section><section className="section-block"><div className="section-heading"><div><span className="eyebrow">{t('home.personalized')}</span><h2>{t('home.yourTake')}</h2></div><button type="button" className="text-link" onClick={onExplore}>{t('common.viewAll')} <Icon name="arrow" size={15} /></button></div><div className="take-row">{personalized.map((take, index) => <TakeCard key={take.id} take={take} onBegin={onBegin} featured={index === 0} language={language} />)}</div><div className="category-shortcuts"><span className="eyebrow">{t('home.categories')}</span>{(interests.length ? interests : ['Wildcards']).slice(0, 5).map(category => <button type="button" key={category} onClick={() => onExploreCategory(category)}>{localizeInterest(category, language)}</button>)}<button type="button" className="shortcut-more" onClick={onSettings}>{t('home.editInterests')} <Icon name="settings" size={13} /></button></div></section><section className="section-block lower-section"><div className="section-heading"><div><span className="eyebrow">{t('home.keepMoving')}</span><h2>{t('home.recentShifts')}</h2></div><button type="button" className="text-link" onClick={onProfile}>{t('common.viewProfile')} <Icon name="arrow" size={15} /></button></div>{history.length ? <div className="recent-grid">{history.slice(0, 2).map(result => <RecentShift key={result.id} result={result} language={language} onViewResult={onViewResult} />)}<div className="mini-stats"><div><span className="mini-stat-icon mint"><Icon name="arrowUp" size={17} /></span><strong>{stats.debatesCompleted}</strong><small>{t('home.debatesCompleted')}</small></div><div><span className="mini-stat-icon yellow"><Icon name="target" size={17} /></span><strong>{stats.averageScore}</strong><small>{t('home.averageScore')}</small></div></div></div> : <div className="empty-state card-surface"><Icon name="spark" size={20} /><strong>{t('home.firstShift')}</strong><span>{t('home.firstShiftBody')}</span></div>}</section></div>
 }
 
 function PersonalHome(props: Parameters<typeof PersonalHomeBase>[0]) {
@@ -286,20 +305,21 @@ function PersonalHome(props: Parameters<typeof PersonalHomeBase>[0]) {
   return <><PersonalHomeBase {...props} />{pulse && <section className="home-pulse-retention card-surface"><div><span className="eyebrow">{t('worldPulse.title')}</span><h2>{pulse.debateStatement}</h2><p>{pulse.neutralContext}</p><small>{t('worldPulse.sources', { count: pulse.sourceCount })} · {t('worldPulse.reviewed')}: {new Date(pulse.lastReviewedAt).toLocaleDateString(props.language)}</small></div><Button variant="dark" onClick={() => props.onChooseDebate(buildWorldPulseTake(pulse, props.language))}>{t('worldPulse.start')}</Button></section>}</>
 }
 
-function PersonalExploreBase({ language, interests, recentIds, onBegin, onChooseDebate, onNotify }: { language: Language; interests: string[]; recentIds: string[]; onBegin: BeginHandler; onChooseDebate: (take?: Take) => void; onNotify: (message: string) => void }) {
+function PersonalExploreBase({ language, interests, recentIds, initialFilter, onBegin, onChooseDebate, onEditInterests, onNotify }: { language: Language; interests: string[]; recentIds: string[]; initialFilter?: string; onBegin: BeginHandler; onChooseDebate: (take?: Take) => void; onEditInterests: () => void; onNotify: (message: string) => void }) {
   const t = useTranslations(language)
-  const [filter, setFilter] = useState('All topics')
+  const [filter, setFilter] = useState(initialFilter || 'All topics')
   const [spotlight, setSpotlight] = useState<Take | null>(null)
+  useEffect(() => { if (initialFilter) setFilter(initialFilter) }, [initialFilter])
   const filtered = takes.filter(take => categoryMatches(take, filter))
   function anotherTake() {
     const next = selectPersonalizedTakes(interests, [...recentIds, ...(spotlight ? [spotlight.id] : [])], 1)[0]
     setSpotlight(next || takes[0])
     onNotify(t('common.anotherTake'))
   }
-  return <div className="page explore-page"><div className="page-heading"><div><span className="eyebrow">{t('explore.eyebrow')}</span><h1>{t('explore.title')}</h1><p className="muted">{t('explore.body')}</p></div><div className="explore-heading-actions"><div className="explore-count"><strong>{filtered.length}</strong><span>{filter === 'All topics' ? t('explore.balanced') : t('explore.inTopic')}</span></div><Button variant="primary" icon="arrow" onClick={() => onChooseDebate(filtered[0] || takes[0])}>{t('common.startDebate')}</Button></div></div><div className="filter-row explore-topic-filters"><button type="button" className={filter === 'All topics' ? 'filter active' : 'filter'} onClick={() => setFilter('All topics')}>{t('explore.allTopics')}</button>{interestOptions.map(item => <button type="button" key={item} className={filter === item ? 'filter active' : 'filter'} onClick={() => setFilter(item)}>{localizeInterest(item, language)}</button>)}<Button variant="secondary" icon="spark" onClick={anotherTake}>{t('common.anotherTake')}</Button></div>{spotlight && <article className="explore-spotlight card-surface"><div><span className="eyebrow">{t('explore.nextTake')}</span><Tag tone="coral">{takeText(spotlight, language).category}</Tag><h2>{takeText(spotlight, language).statement}</h2><p>{takeText(spotlight, language).context}</p></div><Button variant="dark" icon="arrow" onClick={() => onChooseDebate(spotlight)}>{t('common.startThisTake')}</Button></article>}<div className="explore-grid">{filtered.map(take => <TakeCard key={take.id} take={take} onBegin={onBegin} onChooseDebate={onChooseDebate} featured={take.id === 'society-media-age'} language={language} />)}<article className="suggest-card"><span className="suggest-spark"><Icon name="spark" size={20} /></span><h3>{t('explore.keepPrivate')}<br />{t('explore.keepCurious')}</h3><p>{t('explore.privateBody')}</p><Button variant="secondary" icon="settings" onClick={() => onNotify(t('common.editInterests'))}>{t('common.editInterests')}</Button></article></div></div>
+  return <div className="page explore-page"><div className="page-heading"><div><span className="eyebrow">{t('explore.eyebrow')}</span><h1>{t('explore.title')}</h1><p className="muted">{t('explore.body')}</p></div><div className="explore-heading-actions"><div className="explore-count"><strong>{filtered.length}</strong><span>{filter === 'All topics' ? t('explore.balanced') : t('explore.inTopic')}</span></div><Button variant="primary" icon="arrow" onClick={() => onChooseDebate(filtered[0] || takes[0])}>{t('common.startDebate')}</Button></div></div><div className="filter-row explore-topic-filters"><button type="button" className={filter === 'All topics' ? 'filter active' : 'filter'} onClick={() => setFilter('All topics')}>{t('explore.allTopics')}</button>{interestOptions.map(item => <button type="button" key={item} className={filter === item ? 'filter active' : 'filter'} onClick={() => setFilter(item)}>{localizeInterest(item, language)}</button>)}<Button variant="secondary" icon="spark" onClick={anotherTake}>{t('common.anotherTake')}</Button></div>{spotlight && <article className="explore-spotlight card-surface"><div><span className="eyebrow">{t('explore.nextTake')}</span><Tag tone="coral">{takeText(spotlight, language).category}</Tag><h2>{takeText(spotlight, language).statement}</h2><p>{takeText(spotlight, language).context}</p></div><Button variant="dark" icon="arrow" onClick={() => onChooseDebate(spotlight)}>{t('common.startThisTake')}</Button></article>}{filtered.length === 0 ? <div className="empty-state card-surface explore-filter-empty"><Icon name="layers" size={20} /><strong>{t('explore.filterEmpty')}</strong></div> : <div className="explore-grid">{filtered.map(take => <TakeCard key={take.id} take={take} onBegin={onBegin} onChooseDebate={onChooseDebate} featured={take.id === 'society-media-age'} language={language} />)}<article className="suggest-card"><span className="suggest-spark"><Icon name="spark" size={20} /></span><h3>{t('explore.keepPrivate')}<br />{t('explore.keepCurious')}</h3><p>{t('explore.privateBody')}</p><Button variant="secondary" icon="settings" onClick={onEditInterests}>{t('common.editInterests')}</Button></article></div>}</div>
 }
 
-function PersonalExplore(props: { language: Language; interests: string[]; recentIds: string[]; onBegin: BeginHandler; onChooseDebate: (take?: Take) => void; onNotify: (message: string) => void }) {
+function PersonalExplore(props: { language: Language; interests: string[]; recentIds: string[]; initialFilter?: string; onBegin: BeginHandler; onChooseDebate: (take?: Take) => void; onEditInterests: () => void; onNotify: (message: string) => void }) {
   const auth = useAuth()
   const [items, setItems] = useState<WorldPulseItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -317,11 +337,11 @@ function PersonalExplore(props: { language: Language; interests: string[]; recen
   return <><WorldPulsePanel language={props.language} items={items} loading={loading} error={error} hideSensitiveDefault={hideSensitive} onHideSensitiveChange={value => { void persistSensitive(value) }} onChooseDebate={take => props.onChooseDebate(take)} /><PersonalExploreBase {...props} /></>
 }
 
-function PersonalProfileBase({ profile, language, stats, history, onSettings, onBack }: { profile: UserProfile; language: Language; stats: PersonalStats; history: ResultData[]; onSettings: () => void; onBack: () => void }) {
+function PersonalProfileBase({ profile, language, stats, history, onSettings, onBack, onViewResult }: { profile: UserProfile; language: Language; stats: PersonalStats; history: ResultData[]; onSettings: () => void; onBack: () => void; onViewResult: (result: ResultData) => void }) {
   const t = useTranslations(language)
   const name = profile.displayName || 'Curious challenger'
   const firstScore = history[0]?.scores[0]?.score || 0
-  return <div className="page profile-page personal-profile"><div className="page-heading"><div><span className="eyebrow">{t('profile.eyebrow')}</span><h1>{name}<span className="heading-period">.</span></h1><p className="muted">{profile.bio || t('profile.privateBody')}</p></div><Button variant="secondary" icon="settings" onClick={onSettings}>{t('common.editProfile')}</Button></div><div className="profile-overview"><section className="profile-hero card-surface"><div className={`profile-avatar-large avatar-${profile.avatarPreset}`}>{avatarGlyph(profile.avatarPreset)}<span className="online-dot" /></div><h2>{t('profile.keepQuestions')}</h2><p>{t('profile.privateBody')}</p><div className="profile-tags"><Tag tone="coral">{t('common.private')}</Tag><Tag tone="lavender">{stats.currentStreak} {t('profile.currentStreak')}</Tag><Tag tone="yellow">{stats.debatesCompleted} {t('home.debatesCompleted')}</Tag></div></section><section className="profile-stats card-surface"><span className="eyebrow">{t('profile.debateDna')}</span><div className="dna-chart"><div className="dna-ring"><strong>{stats.averageScore || '—'}</strong><small>{t('profile.averageScore')}</small></div><div className="dna-legend"><span><i className="legend-coral" /> {t('profile.strongest')} <b>{stats.strongestDimension}</b></span><span><i className="legend-lavender" /> {t('profile.currentStreak')} <b>{stats.currentStreak}</b></span><span><i className="legend-yellow" /> {t('profile.categories')} <b>{stats.categoriesExplored}</b></span><span><i className="legend-blue" /> {t('profile.latestSignal')} <b>{firstScore || '—'}</b></span></div></div><p className="ai-disclaimer"><Icon name="info" size={14} /> {t('profile.aiDisclaimer')}</p></section></div><section className="profile-metric-grid"><div className="metric-card"><strong>{stats.bestStreak}</strong><span>{t('profile.bestStreak')}</span></div><div className="metric-card"><strong>{stats.sideSwitchCompleted}</strong><span>{t('profile.sideSwitch')}</span></div><div className="metric-card"><strong>{stats.classicCompleted}</strong><span>{t('profile.classic')}</span></div><div className="metric-card"><strong>{stats.challengeResponses}</strong><span>{t('profile.challengeResponses')}</span></div><div className="metric-card"><strong>{stats.challengeCreated}</strong><span>{t('profile.challengesCreated')}</span></div></section><section className="section-block profile-history"><div className="section-heading"><div><span className="eyebrow">{t('profile.history')}</span><h2>{t('home.recentShifts')}</h2></div><span className="muted">{stats.totalActiveDays} {t('profile.activeDays')}</span></div>{history.length ? <div className="recent-grid">{history.slice(0, 5).map(result => <RecentShift key={result.id} result={result} language={language} />)}</div> : <div className="empty-state card-surface"><strong>{t('profile.noDebates')}</strong><span>{t('profile.firstResult')}</span></div>}</section><div className="profile-footer"><button type="button" className="back-link" onClick={onBack}><Icon name="arrow" size={15} /> {t('common.back')}</button><span><Icon name="lock" size={13} /> {t('profile.privateDefault')}</span></div></div>
+  return <div className="page profile-page personal-profile"><div className="page-heading"><div><span className="eyebrow">{t('profile.eyebrow')}</span><h1>{name}<span className="heading-period">.</span></h1><p className="muted">{profile.bio || t('profile.privateBody')}</p></div><Button variant="secondary" icon="settings" onClick={onSettings}>{t('common.editProfile')}</Button></div><div className="profile-overview"><section className="profile-hero card-surface"><div className={`profile-avatar-large avatar-${profile.avatarPreset}`}>{avatarGlyph(profile.avatarPreset)}<span className="online-dot" /></div><h2>{t('profile.keepQuestions')}</h2><p>{t('profile.privateBody')}</p><div className="profile-tags"><Tag tone="coral">{t('common.private')}</Tag><Tag tone="lavender">{stats.currentStreak} {t('profile.currentStreak')}</Tag><Tag tone="yellow">{stats.debatesCompleted} {t('home.debatesCompleted')}</Tag></div></section><section className="profile-stats card-surface"><span className="eyebrow">{t('profile.debateDna')}</span><div className="dna-chart"><div className="dna-ring"><strong>{stats.averageScore || '—'}</strong><small>{t('profile.averageScore')}</small></div><div className="dna-legend"><span><i className="legend-coral" /> {t('profile.strongest')} <b>{stats.strongestDimension}</b></span><span><i className="legend-lavender" /> {t('profile.currentStreak')} <b>{stats.currentStreak}</b></span><span><i className="legend-yellow" /> {t('profile.categories')} <b>{stats.categoriesExplored}</b></span><span><i className="legend-blue" /> {t('profile.latestSignal')} <b>{firstScore || '—'}</b></span></div></div><p className="ai-disclaimer"><Icon name="info" size={14} /> {t('profile.aiDisclaimer')}</p></section></div><section className="profile-metric-grid"><div className="metric-card"><strong>{stats.bestStreak}</strong><span>{t('profile.bestStreak')}</span></div><div className="metric-card"><strong>{stats.sideSwitchCompleted}</strong><span>{t('profile.sideSwitch')}</span></div><div className="metric-card"><strong>{stats.classicCompleted}</strong><span>{t('profile.classic')}</span></div><div className="metric-card"><strong>{stats.challengeResponses}</strong><span>{t('profile.challengeResponses')}</span></div><div className="metric-card"><strong>{stats.challengeCreated}</strong><span>{t('profile.challengesCreated')}</span></div></section><section className="section-block profile-history"><div className="section-heading"><div><span className="eyebrow">{t('profile.history')}</span><h2>{t('home.recentShifts')}</h2></div><span className="muted">{stats.totalActiveDays} {t('profile.activeDays')}</span></div>{history.length ? <div className="recent-grid">{history.slice(0, 5).map(result => <RecentShift key={result.id} result={result} language={language} onViewResult={onViewResult} />)}</div> : <div className="empty-state card-surface"><strong>{t('profile.noDebates')}</strong><span>{t('profile.firstResult')}</span></div>}</section><div className="profile-footer"><button type="button" className="back-link" onClick={onBack}><Icon name="arrow" size={15} /> {t('common.back')}</button><span><Icon name="lock" size={13} /> {t('profile.privateDefault')}</span></div></div>
 }
 
 function PersonalProfile(props: Parameters<typeof PersonalProfileBase>[0]) {
@@ -331,29 +351,7 @@ function PersonalProfile(props: Parameters<typeof PersonalProfileBase>[0]) {
 
 function AiDefaultsSection({ language, preferences, onChange }: { language: Language; preferences: UserPreferences; onChange: (patch: Partial<UserPreferences>) => void }) {
   const t = useTranslations(language)
-  return <section className="settings-section card-surface"><div className="settings-section-heading"><div><span className="eyebrow">{t('settings.aiDefaults')}</span><h2>{t('settings.preferredOpponent')}</h2></div><Icon name="spark" size={21} /></div><p className="field-help settings-intro">{t('settings.aiDefaultsBody')}</p><div className="settings-fields-grid"><label className="field-label">{t('settings.preferredOpponent')}<select className="settings-select" value={preferences.preferredOpponentType} onChange={event => onChange({ preferredOpponentType: event.target.value as UserPreferences['preferredOpponentType'] })}><option value="ask">{t('settings.askEveryTime')}</option><option value="ai">{t('settings.aiOpponent')}</option><option value="person">{t('settings.personOpponent')}</option></select></label><label className="field-label">{t('settings.aiFamily')}<select className="settings-select" value={preferences.preferredAiFamily} onChange={event => onChange({ preferredAiFamily: event.target.value as UserPreferences['preferredAiFamily'] })}><option value="Gemini">Gemini</option><option value="Claude">Claude</option><option value="GPT">GPT</option><option value="DeepSeek">DeepSeek</option></select></label><label className="field-label">{t('settings.modelQuality')}<select className="settings-select" value={preferences.aiQuality} onChange={event => onChange({ aiQuality: event.target.value as UserPreferences['aiQuality'] })}><option value="fast">{t('shell.classic')}</option><option value="balanced">{t('explore.balanced')}</option><option value="maximum">{t('settings.modelQuality')}</option></select></label><label className="field-label">{t('settings.responseLength')}<select className="settings-select" value={preferences.aiResponseLength} onChange={event => onChange({ aiResponseLength: event.target.value as UserPreferences['aiResponseLength'] })}><option value="concise">Concise</option><option value="standard">Standard</option><option value="detailed">Detailed</option></select></label></div><label className="toggle-row"><input type="checkbox" checked={preferences.showModelDetails} onChange={event => onChange({ showModelDetails: event.target.checked })} /><span>{t('settings.showModelDetails')}</span><small>{t('settings.modelDetailsHelp')}</small></label></section>
-}
-
-function BetaFeedbackForm({ language, surface, screen, aiModelId, onSubmit }: { language: Language; surface: BetaFeedbackInput['surface']; screen: string; aiModelId?: string | null; onSubmit: (payload: BetaFeedbackInput) => Promise<void> }) {
-  const t = useTranslations(language)
-  const german = language === 'de'
-  const [category, setCategory] = useState<BetaFeedbackCategory>('suggestion')
-  const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
-  const labels: Array<[BetaFeedbackCategory, string]> = german ? [['broken', 'Funktion kaputt'], ['ai_quality', 'KI-Qualität'], ['design_usability', 'Design / Bedienung'], ['missing_topic', 'Thema fehlt'], ['suggestion', 'Vorschlag'], ['other', 'Sonstiges']] : [['broken', 'Something is broken'], ['ai_quality', 'AI quality'], ['design_usability', 'Design / usability'], ['missing_topic', 'Missing topic'], ['suggestion', 'Suggestion'], ['other', 'Other']]
-  async function submit() {
-    if (busy) return
-    setBusy(true)
-    setError('')
-    try {
-      await onSubmit({ category, message: message.trim() || null, surface, screen, aiModelId: aiModelId || null, appVersion: import.meta.env.VITE_APP_VERSION || '0.1.0-beta' })
-      setSent(true); setMessage('')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : (german ? 'Feedback konnte nicht gesendet werden.' : 'Feedback could not be sent.'))
-    } finally { setBusy(false) }
-  }
-  return <section className="settings-section card-surface beta-feedback"><div className="settings-section-heading"><div><span className="eyebrow">PRIVATE BETA</span><h2>{t('feedback.title')}</h2></div><Icon name="message" size={21} /></div><p className="field-help">{t('feedback.body')}</p><div className="feedback-options" role="group" aria-label={t('feedback.type')}>{labels.map(([value, label]) => <button type="button" key={value} className={category === value ? 'selected' : ''} aria-pressed={category === value} onClick={() => { setCategory(value); setSent(false) }}>{label}</button>)}</div><label className="field-label" htmlFor={`beta-feedback-${surface}`}>{t('feedback.shortNote')}</label><textarea id={`beta-feedback-${surface}`} className="settings-textarea" maxLength={600} value={message} onChange={event => { setMessage(event.target.value); setSent(false); setError('') }} placeholder={t('feedback.placeholder')} /><div className="feedback-submit-row"><small>{message.length} / 600</small><Button variant="secondary" onClick={() => void submit()} disabled={busy}>{busy ? t('common.sending') : t('common.sendFeedback')}</Button></div>{error && <p className="form-error" role="alert">{error}</p>}{sent && <p className="form-success" role="status">{t('feedback.thanks')}</p>}</section>
+  return <section className="settings-section card-surface"><div className="settings-section-heading"><div><span className="eyebrow">{t('settings.aiDefaults')}</span><h2>{t('settings.preferredOpponent')}</h2></div><Icon name="spark" size={21} /></div><p className="field-help settings-intro">{t('settings.aiDefaultsBody')}</p><div className="settings-fields-grid"><label className="field-label">{t('settings.preferredOpponent')}<select className="settings-select" value={preferences.preferredOpponentType} onChange={event => onChange({ preferredOpponentType: event.target.value as UserPreferences['preferredOpponentType'] })}><option value="ask">{t('settings.askEveryTime')}</option><option value="ai">{t('settings.aiOpponent')}</option><option value="person">{t('settings.personOpponent')}</option></select></label><label className="field-label">{t('settings.aiFamily')}<select className="settings-select" value={preferences.preferredAiFamily} onChange={event => onChange({ preferredAiFamily: event.target.value as UserPreferences['preferredAiFamily'] })}><option value="Gemini">Gemini</option><option value="Claude">Claude</option><option value="GPT">GPT</option><option value="DeepSeek">DeepSeek</option></select></label><label className="field-label">{t('settings.modelQuality')}<select className="settings-select" value={preferences.aiQuality} onChange={event => onChange({ aiQuality: event.target.value as UserPreferences['aiQuality'] })}><option value="fast">{t('shell.classic')}</option><option value="balanced">{t('explore.balanced')}</option><option value="maximum">{t('settings.modelQuality')}</option></select></label><label className="field-label">{t('settings.responseLength')}<select className="settings-select" value={preferences.aiResponseLength} onChange={event => onChange({ aiResponseLength: event.target.value as UserPreferences['aiResponseLength'] })}><option value="concise">{t('ai.responseConcise')}</option><option value="standard">{t('ai.responseStandard')}</option><option value="detailed">{t('ai.responseDetailed')}</option></select></label></div><label className="toggle-row"><input type="checkbox" checked={preferences.showModelDetails} onChange={event => onChange({ showModelDetails: event.target.checked })} /><span>{t('settings.showModelDetails')}</span><small>{t('settings.modelDetailsHelp')}</small></label></section>
 }
 
 function ProfileSocialPanel({ profile, userId, repository, onProfile, onNotify }: { profile: UserProfile; userId: string; repository: AppRepository; onProfile: (value: UserProfile, forceAvatarRevision?: boolean) => Promise<void>; onNotify: (message: string) => void }) {
@@ -415,9 +413,19 @@ function SignedOutWelcome({ language, onStart, onRequestSignInOtp, onVerifySignI
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    function handleNativeBack(event: Event) {
+      if (view === 'welcome') return
+      event.preventDefault()
+      setView('welcome')
+    }
+    window.addEventListener('sideshift-native-back', handleNativeBack)
+    return () => window.removeEventListener('sideshift-native-back', handleNativeBack)
+  }, [view])
+
   async function continueAsGuest() {
     setStarting(true); setError('')
-    try { await onStart() } catch { setError(t('auth.otpRequestFailed')); setStarting(false) }
+    try { await onStart() } catch { setError(t('auth.guestFailed')); setStarting(false) }
   }
 
   if (view === 'sign-in') return <div className="onboarding-page signed-out-page"><div className="onboarding-top"><Logo /><span className="onboarding-meta"><Icon name="lock" size={14} /> {t('common.privateByDefault')}</span></div><main className="signed-out-panel"><button type="button" className="back-link" onClick={() => setView('welcome')}><Icon name="arrow" size={15} /> {t('auth.backToWelcome')}</button><EmailOtpFlow language={language} mode="sign-in" requestCode={onRequestSignInOtp} verifyCode={onVerifySignInOtp} /></main></div>
@@ -442,6 +450,7 @@ function App() {
   const [userName, setUserName] = useState('')
   const [interests, setInterests] = useState<string[]>([])
   const [language, setLanguage] = useState<Language>(() => getInitialLanguage())
+  const t = useTranslations(language)
   const [profileData, setProfileData] = useState<UserProfile>(defaultProfile(''))
   const [preferencesData, setPreferencesData] = useState<UserPreferences>(defaultPreferences(''))
   const [statsSnapshot, setStatsSnapshot] = useState<UserStatsSnapshot>(emptyStatsSnapshot)
@@ -464,13 +473,32 @@ function App() {
   const [aiRuntime, setAiRuntime] = useState<AiRuntimeSnapshot>(() => createAiRuntimeSnapshot({ mock: mockAi, puterStatus: 'disconnected', basicServerAvailable: false }))
   const aiMode = aiRuntime.primary
   const mockAiProvider = useMemo<AiProvider>(() => createMockAiProvider({ streamDelayMs: 1 }), [])
-  const basicAiProvider = useMemo<AiProvider>(() => mockAi ? mockAiProvider : createBasicAiProvider({ accessToken: auth.accessToken, userId }), [auth.accessToken, mockAi, mockAiProvider, userId])
+  const hostedBasicProvider = useMemo<AiProvider>(() => mockAi ? mockAiProvider : createBasicAiProvider({ accessToken: auth.accessToken, userId }), [auth.accessToken, mockAi, mockAiProvider, userId])
+  const [engineStatusNote, setEngineStatusNote] = useState<'idle' | 'enhanced' | 'reliable' | 'offline' | 'enhancement_unavailable' | 'quota' | 'local_review'>('idle')
+  const debateEngineProvider = useMemo<AiProvider>(() => mockAi ? mockAiProvider : createDebateEngineProvider({
+    online: () => online,
+    enhancedProvider: hostedBasicProvider,
+    onEngineEvent: event => {
+      if (event.kind === 'evaluation') setEngineStatusNote(event.mode === 'enhanced' ? 'enhanced' : 'local_review')
+      else if (!online) setEngineStatusNote('offline')
+      else if (event.mode === 'enhanced') setEngineStatusNote('enhanced')
+      else if (event.fallbackReason === 'quota_exhausted') setEngineStatusNote('quota')
+      else if (event.fallbackReason) setEngineStatusNote('reliable')
+      else setEngineStatusNote('reliable')
+    },
+  }), [hostedBasicProvider, mockAi, mockAiProvider, online])
+  const basicAiProvider = debateEngineProvider
   const unavailablePuterProvider = useMemo<AiProvider>(() => createUnavailableAiProvider('puter'), [])
   const [liveAiProvider, setLiveAiProvider] = useState<AiProvider | null>(null)
   const [aiTake, setAiTake] = useState<Take>(takes[0])
   const [aiConfig, setAiConfig] = useState<AiStartConfig | null>(null)
   const [aiSnapshot, setAiSnapshot] = useState<AiDebateData | null>(null)
   const [aiPreset, setAiPreset] = useState<Partial<AiStartConfig> | undefined>()
+  const [debateRecoveryIssue, setDebateRecoveryIssue] = useState<DebateRecoveryIssue | null>(null)
+  const [settingsInitialSection, setSettingsInitialSection] = useState<'hub' | 'help'>('hub')
+  const [exploreFilter, setExploreFilter] = useState('All topics')
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
+  const ownedTakeIdRef = useRef('')
   const [teamSession, setTeamSession] = useState<TeamDebateSession | null>(null)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [teamInitialTopic, setTeamInitialTopic] = useState<{ statement: string; context: string; takeId: string | null; custom: boolean } | undefined>()
@@ -479,7 +507,7 @@ function App() {
   const personalStats = useMemo(() => calculatePersonalStats(history, statsSnapshot), [history, statsSnapshot])
   const debateSaveQueueRef = useRef(Promise.resolve())
   const latestQueuedDebateRef = useRef<{ id: string; step: number } | null>(null)
-  const aiProvider = mockAi ? mockAiProvider : aiConfig?.opponent.id === 'sideshift-basic' ? basicAiProvider : liveAiProvider || unavailablePuterProvider
+  const aiProvider = mockAi ? mockAiProvider : (!aiConfig || aiConfig.opponent.id === 'sideshift-basic') ? basicAiProvider : liveAiProvider || unavailablePuterProvider
 
   async function queueClassicDebateSave(snapshot: DebateSnapshot) {
     if (!repository || !userId) return
@@ -598,22 +626,46 @@ function App() {
       setLanguage(nextLanguage)
       persistLanguage(nextLanguage)
       setHasOnboarded(nextPreferences.onboardingCompleted)
-      const storedTake = result?.take || getTake(debate?.takeId || takes[0].id)
-      const snapshotTake = debate?.worldPulse ? { ...storedTake, id: `world-pulse:${debate.worldPulse.id}`, category: debate.worldPulse.category, statement: debate.worldPulse.debateStatement, context: debate.worldPulse.neutralContext, supportLabel: debate.worldPulse.sideALabel, opposeLabel: debate.worldPulse.sideBLabel, worldPulse: debate.worldPulse } : storedTake
-      const restoredTake = debate?.ai?.customMotion ? privateTake(debate.ai.customMotion, snapshotTake) : snapshotTake
+      const storedTake = resolveDebateTake({ debate: debate?.status === 'active' ? debate : null, result, fallbackTakeId: takes[0].id })
+      const restoredTake = storedTake
+      ownedTakeIdRef.current = debate?.status === 'active' ? debate.takeId : restoredTake.id
       setActiveTake(restoredTake)
+      const nextAiConfig = debate?.ai ? hydratedAiConfig(debate.ai) : result?.ai ? hydratedResultAiConfig(result) : null
       if (debate?.ai) {
         setAiTake(restoredTake)
         setAiSnapshot(debate.ai)
-        setAiConfig(hydratedAiConfig(debate.ai))
+        setAiConfig(nextAiConfig)
+        const debateLangCode = normalizeDebateLanguageCode(debate.ai.debateLanguageCode || debate.language, nextLanguage)
+        const debateLang = resolveDebateLanguage({
+          mode: debate.ai.debateLanguageMode || 'explicit',
+          explicitCode: debateLangCode,
+          lockedCode: debateLangCode,
+          locked: debate.ai.debateLanguageLocked ?? true,
+          profilePreference: nextPreferences.debateLanguages[0],
+          interfaceLocale: nextLanguage,
+          firstSubstantiveArgument: debate.ai.transcript.find(turn => turn.role === 'user')?.content,
+        })
+        setActiveDebateEngineContext({
+          debateId: debate.id,
+          takeId: restoredTake.id,
+          motion: aiDebateMotion(restoredTake, nextLanguage, debate.ai.customMotion),
+          userSide: debate.ai.userSide,
+          aiSide: debate.ai.aiSide,
+          language: debateLang.code,
+          languageName: debateLang.displayName,
+          roundLimit: debate.ai.roundLimit,
+          previousTactics: debate.ai.transcript.filter(turn => turn.role === 'opponent').map(turn => turn.tactic || '').filter(Boolean),
+        })
       } else if (result?.ai) {
         setAiTake(restoredTake)
         setAiSnapshot(null)
-        setAiConfig(hydratedResultAiConfig(result))
+        setAiConfig(nextAiConfig)
       } else {
         setAiSnapshot(null)
         setAiConfig(null)
       }
+      const recoveryIssue = assessDebateRecovery(debate?.status === 'active' ? debate : null, nextAiConfig)
+      setDebateRecoveryIssue(recoveryIssue)
       setActiveMode(debate?.mode || result?.mode || nextPreferences.preferredMode)
       setDebateId(debate?.id || '')
       setDebateStep(debate?.step || 0)
@@ -633,7 +685,7 @@ function App() {
         setActiveTake(setupTake)
         setAiTake(setupTake)
         setScreen('aiSetup')
-      } else setScreen(groupPathId ? 'groups' : storedTeamSession ? 'team' : debate?.status === 'active' ? (debate.ai ? 'aiDebate' : 'debate') : result?.ai ? 'aiResults' : result ? 'results' : 'home')
+      } else setScreen(groupPathId ? 'groups' : storedTeamSession ? 'team' : recoveryIssue ? 'debateRecovery' : debate?.status === 'active' ? (debate.ai ? 'aiDebate' : 'debate') : result?.ai ? 'aiResults' : result ? 'results' : 'home')
       setHydratedUserId(userId)
     }).catch(caught => { if (active) setDataError(caught instanceof Error ? caught.message : 'Private data could not be loaded.') })
     return () => { active = false }
@@ -647,7 +699,7 @@ function App() {
 
   useEffect(() => {
     if (!repository || !userId || hydratedUserId !== userId || screen !== 'debate' || !debateId) return
-    const debate: DebateSnapshot = { id: debateId, takeId: activeTake.id, mode: activeMode, step: debateStep, stance, postStance, confidence, understanding, responses, opponentMessages, assignedSide: assignSide(stance, activeMode, activeTake), language, status: 'active', updatedAt: new Date().toISOString() }
+    const debate: DebateSnapshot = { id: debateId, takeId: ownedTakeIdRef.current || activeTake.id, mode: activeMode, step: debateStep, stance, postStance, confidence, understanding, responses, opponentMessages, assignedSide: assignSide(stance, activeMode, activeTake), language, status: 'active', updatedAt: new Date().toISOString() }
     void queueClassicDebateSave(debate).catch(caught => setDataError(caught instanceof Error ? caught.message : 'Private debate data could not be saved.'))
   }, [activeMode, activeTake.id, debateId, debateStep, hydratedUserId, language, opponentMessages, postStance, repository, responses, screen, stance, confidence, understanding, userId])
 
@@ -657,11 +709,11 @@ function App() {
     const currentDebateId = debateId
     const timeout = window.setTimeout(() => {
       if (aiCompletionGuardRef.current.isActive(currentDebateId)) return
-      const debate: DebateSnapshot = { id: debateId, takeId: activeTake.id, mode: 'classic', step: aiSnapshot.roundLimit, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: aiConfig.userSide, language, status: 'active', updatedAt: new Date().toISOString(), ai: aiSnapshot }
+      const debate: DebateSnapshot = { id: debateId, takeId: ownedTakeIdRef.current || aiTake.id, mode: 'classic', step: aiSnapshot.roundLimit, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: aiConfig.userSide, language, status: 'active', updatedAt: new Date().toISOString(), ai: aiSnapshot }
       void repository.saveDebate(userId, debate).catch(caught => setDataError(caught instanceof Error ? caught.message : 'Private AI debate data could not be saved.'))
     }, 250)
     return () => window.clearTimeout(timeout)
-  }, [activeTake.id, aiConfig, aiSnapshot, debateId, hydratedUserId, language, repository, screen, userId])
+  }, [aiTake.id, aiConfig, aiSnapshot, debateId, hydratedUserId, language, repository, screen, userId])
 
   useEffect(() => {
     let active = true
@@ -769,47 +821,97 @@ function App() {
   }
 
   async function startAiDebate(config: AiStartConfig, take: Take) {
-    if (!online) throw new Error('Reconnect before starting an AI debate.')
     if (!repository || !userId) throw new Error('Authentication is not ready yet.')
     if (!config.opponent.model) throw new Error('The selected AI model is no longer available. Refresh the opponent list.')
     const nextPreferences = normalizePreferences({ ...preferencesData, preferredAiFamily: config.opponent.family, preferredOpponentId: config.opponent.id, preferredAiModelId: config.opponent.model?.id || null, aiDifficulty: config.difficulty, aiRoundLength: config.roundLength, aiQuality: config.quality, aiResponseLength: config.responseLength })
     setPreferencesData(nextPreferences)
     void repository.savePreferences(nextPreferences).catch(caught => setDataError(caught instanceof Error ? caught.message : 'AI preferences could not be saved.'))
     const id = makeUuid()
-    const snapshot: AiDebateData = { opponentId: config.opponent.id, family: config.opponent.family, modelId: config.opponent.model.id, difficulty: config.difficulty, roundLength: config.roundLength, quality: config.quality, responseLength: config.responseLength, modelSelection: config.modelSelection, roundLimit: aiRoundLimit(config.roundLength), userSide: config.userSide, aiSide: config.aiSide, customMotion: config.customMotion, transcript: [], partialResponse: '', interrupted: false, completionReason: null }
-    const debate: DebateSnapshot = { id, takeId: take.id, mode: 'classic', step: 0, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: config.userSide, language, status: 'active', updatedAt: new Date().toISOString(), ai: snapshot }
+    const motion = aiDebateMotion(take, language, config.customMotion)
+    const debateLang = resolveDebateLanguage({
+      mode: config.debateLanguageMode,
+      explicitCode: config.debateLanguageCode,
+      profilePreference: preferencesData.debateLanguages[0],
+      interfaceLocale: language,
+    })
+    setActiveDebateEngineContext({
+      debateId: id,
+      takeId: take.id,
+      motion,
+      userSide: config.userSide,
+      aiSide: config.aiSide,
+      language: debateLang.code,
+      languageName: debateLang.displayName,
+      roundLimit: aiRoundLimit(config.roundLength),
+      previousTactics: [],
+    })
+    const snapshot: AiDebateData = { opponentId: config.opponent.id, family: config.opponent.family, modelId: config.opponent.model.id, difficulty: config.difficulty, roundLength: config.roundLength, quality: config.quality, responseLength: config.responseLength, modelSelection: config.modelSelection, roundLimit: aiRoundLimit(config.roundLength), userSide: config.userSide, aiSide: config.aiSide, customMotion: config.customMotion, debateLanguageCode: debateLang.code, debateLanguageMode: config.debateLanguageMode, debateLanguageLocked: debateLang.locked, transcript: [], partialResponse: '', interrupted: false, completionReason: null }
+    const debate: DebateSnapshot = { id, takeId: take.id, mode: 'classic', step: 0, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: config.userSide, language: debateLang.code, status: 'active', updatedAt: new Date().toISOString(), ai: snapshot }
     await repository.saveDebate(userId, debate)
-    setActiveTake(take); setAiTake(take); setAiConfig(config); setAiSnapshot(snapshot); setActiveMode('classic'); setDebateId(id); setDebateStep(0); setLastResult(null); setScreen('aiDebate')
+    setActiveTake(take); setAiTake(take); setAiConfig(config); setAiSnapshot(snapshot); setActiveMode('classic'); setDebateId(id); setDebateStep(0); setLastResult(null); ownedTakeIdRef.current = take.id; setDebateRecoveryIssue(null); setScreen('aiDebate')
     trackEvent(history.length ? 'second_debate_started' : 'debate_started', { mode: 'classic', ai_opponent: config.opponent.id, ai_round_length: config.roundLength })
   }
 
   async function completeAiDebate(transcript: AiDebateData['transcript']) {
     if (!repository || !userId || !debateId || !aiConfig || !aiSnapshot) throw new Error('The active AI debate is not available.')
+    const debateLangCode = normalizeDebateLanguageCode(aiSnapshot.debateLanguageCode || language, language)
+    const debateLangName = debateLanguageDisplayName(debateLangCode, language)
     const outcome = await runAiDebateCompletion({
       debateId,
       transcript,
       aiTake,
       aiConfig,
       aiSnapshot,
-      language,
+      language: debateLangCode,
       repository,
       userId,
       guard: aiCompletionGuardRef.current,
       makeId: makeUuid,
       evaluate: async () => {
         const contextTranscript = transcript.map(turn => ({ role: turn.role === 'opponent' ? 'assistant' as const : 'user' as const, round: turn.round, content: turn.content }))
-        return aiProvider.evaluate(buildEvaluationContext({ motion: aiDebateMotion(aiTake, language, aiSnapshot.customMotion), userSide: aiConfig.userSide, aiSide: aiConfig.aiSide, language, transcript: contextTranscript }), aiSnapshot.modelId, { debateId, requestId: `${debateId}-evaluation` })
+        return aiProvider.evaluate(buildEvaluationContext({ motion: aiDebateMotion(aiTake, language, aiSnapshot.customMotion), userSide: aiConfig.userSide, aiSide: aiConfig.aiSide, languageCode: debateLangCode, languageName: debateLangName, transcript: contextTranscript }), aiSnapshot.modelId, { debateId, requestId: `${debateId}-evaluation` })
       },
     })
     if (outcome.status === 'aborted') return
     const now = outcome.result.completedAt
     const nextHistory = [outcome.result, ...history.filter(item => item.id !== outcome.result.id)].slice(0, 20)
-    setLastResult(outcome.result); setHistory(nextHistory); setAiSnapshot(outcome.completedSnapshot); setDebateId(''); setScreen('aiResults'); setStatsSnapshot(current => ({ ...current, activityDates: [...current.activityDates, now] })); trackEvent('debate_completed', { score: outcome.result.score, movement: 0, ai_opponent: aiConfig.opponent.id })
+    setLastResult(outcome.result); setHistory(nextHistory); setAiSnapshot(outcome.completedSnapshot); setDebateId(''); ownedTakeIdRef.current = ''; setDebateRecoveryIssue(null); setScreen('aiResults'); setStatsSnapshot(current => ({ ...current, activityDates: [...current.activityDates, now] })); trackEvent('debate_completed', { score: outcome.result.score, movement: 0, ai_opponent: aiConfig.opponent.id })
+  }
+
+  async function discardBrokenDebate() {
+    if (!repository || !userId || !debateId) return
+    if (!window.confirm(t('debate.recovery.discardConfirm'))) return
+    setRecoveryBusy(true)
+    try {
+      aiCompletionGuardRef.current.release(debateId)
+      clearArgumentDraft(`ai:${debateId}`)
+      await repository.saveDebate(userId, null)
+      setDebateId('')
+      setAiSnapshot(null)
+      setAiConfig(null)
+      ownedTakeIdRef.current = ''
+      setDebateRecoveryIssue(null)
+      setScreen('home')
+    } catch (caught) {
+      setDataError(caught instanceof Error ? caught.message : t('debate.recovery.discardFailed'))
+    } finally {
+      setRecoveryBusy(false)
+    }
+  }
+
+  function resumeRecoveredDebate() {
+    setDebateRecoveryIssue(null)
+    setScreen(aiSnapshot && aiConfig ? 'aiDebate' : 'debate')
+  }
+
+  function openHelp() {
+    setSettingsInitialSection('help')
+    setScreen('settings')
   }
 
   async function exitAiDebate() {
     if (repository && userId && debateId && aiConfig && aiSnapshot) {
-      await repository.saveDebate(userId, { id: debateId, takeId: aiTake.id, mode: 'classic', step: aiSnapshot.roundLimit, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: aiConfig.userSide, language, status: 'active', updatedAt: new Date().toISOString(), ai: aiSnapshot }).catch(() => undefined)
+      await repository.saveDebate(userId, { id: debateId, takeId: ownedTakeIdRef.current || aiTake.id, mode: 'classic', step: aiSnapshot.roundLimit, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: aiConfig.userSide, language, status: 'active', updatedAt: new Date().toISOString(), ai: aiSnapshot }).catch(() => undefined)
     }
     setScreen('home')
   }
@@ -824,7 +926,7 @@ function App() {
     const responseStep = nextStep - 1
     const nextResponses = response ? { ...responses, [responseStep]: response } : responses
     const nextOpponentMessages = opponentMessage ? { ...opponentMessages, [responseStep]: opponentMessage } : opponentMessages
-    const snapshot: DebateSnapshot = { id: debateId, takeId: activeTake.id, mode: activeMode, step: nextStep, stance, postStance, confidence, understanding, responses: nextResponses, opponentMessages: nextOpponentMessages, assignedSide: assignSide(stance, activeMode, activeTake), language, status: 'active', updatedAt: new Date().toISOString(), worldPulse: activeTake.worldPulse }
+    const snapshot: DebateSnapshot = { id: debateId, takeId: ownedTakeIdRef.current || activeTake.id, mode: activeMode, step: nextStep, stance, postStance, confidence, understanding, responses: nextResponses, opponentMessages: nextOpponentMessages, assignedSide: assignSide(stance, activeMode, activeTake), language, status: 'active', updatedAt: new Date().toISOString(), worldPulse: activeTake.worldPulse }
     await queueClassicDebateSave(snapshot)
   }
   async function beginDebate(mode: Mode, take = activeTake) {
@@ -834,7 +936,7 @@ function App() {
     const snapshot: DebateSnapshot = { id, takeId: take.id, mode, step: 0, stance: 1, postStance: 1, confidence: 4, understanding: 'yes', responses: {}, opponentMessages: {}, assignedSide: assignSide(1, mode, take), language, status: 'active', updatedAt: new Date().toISOString(), worldPulse: take.worldPulse }
     try {
       await queueClassicDebateSave(snapshot)
-      setActiveTake(take); setActiveMode(mode); setDebateId(id); setDebateStep(0); setStance(1); setPostStance(1); setConfidence(4); setUnderstanding('yes'); setResponses({}); setOpponentMessages({}); setLastResult(null); setScreen('debate'); trackEvent(history.length ? 'second_debate_started' : 'debate_started', { mode })
+      setActiveTake(take); setActiveMode(mode); setDebateId(id); ownedTakeIdRef.current = take.id; setDebateRecoveryIssue(null); setDebateStep(0); setStance(1); setPostStance(1); setConfidence(4); setUnderstanding('yes'); setResponses({}); setOpponentMessages({}); setLastResult(null); setScreen('debate'); trackEvent(history.length ? 'second_debate_started' : 'debate_started', { mode })
     } catch (caught) { notify(caught instanceof Error ? caught.message : 'The debate could not be started. Try again.') }
   }
 
@@ -862,6 +964,22 @@ function App() {
     setStatsSnapshot(current => ({ ...current, activityDates: [...current.activityDates, now] }))
   }
 
+  function viewResult(result: ResultData) {
+    setLastResult(result)
+    setScreen(result.ai ? 'aiResults' : 'results')
+  }
+
+  function openExplore(category?: string) {
+    if (category) setExploreFilter(category)
+    else setExploreFilter('All topics')
+    setScreen('explore')
+  }
+
+  function openSettingsForInterests() {
+    setSettingsInitialSection('hub')
+    setScreen('settings')
+  }
+
   async function submitReport(payload: ReportInput) {
     if (!online) throw new Error('You are offline. Reconnect before submitting a report.')
     if (!repository || !userId) throw new Error('Authentication is not ready yet.')
@@ -887,30 +1005,30 @@ function App() {
     } catch (caught) { notify(caught instanceof Error ? caught.message : 'Your beta data could not be deleted.') }
   }
 
-  if (auth.loading) return <BackendGate title="Connecting…" message="Establishing your private SideShift session." />
-  if (auth.error) return <BackendGate title="Private session unavailable" message={auth.error} action={{ label: 'Retry connection', onClick: auth.retry }} />
+  if (auth.loading) return <BackendGate title={t('status.connecting')} message={t('status.privateSession')} />
+  if (auth.error) return <BackendGate title={t('status.privateUnavailable')} message={auth.error} action={{ label: t('status.retryConnection'), onClick: auth.retry }} />
   if (legalPath === '/privacy') return <LegalPage kind="privacy" />
   if (legalPath === '/terms') return <LegalPage kind="terms" />
   if (legalPath === '/community') return <LegalPage kind="community" />
   if (auth.signedOut) return <SignedOutWelcome language={language} onStart={auth.continueAsGuest} onRequestSignInOtp={auth.requestSignInOtp} onVerifySignInOtp={auth.verifySignInOtp} />
-  if (!repository || !userId) return <BackendGate title="Backend unavailable" message="SideShift could not establish an authenticated data path." action={{ label: 'Retry connection', onClick: auth.retry }} />
+  if (!repository || !userId) return <BackendGate title={t('status.backendUnavailable')} message={t('status.backendMessage')} action={{ label: t('status.retryConnection'), onClick: auth.retry }} />
   if (legalPath === '/internal/world-pulse') return <Suspense fallback={<FeatureLoading language={language} />}><WorldPulseAdmin repository={repository} userId={userId} language={language} /></Suspense>
   if (challengeToken) return <Suspense fallback={<FeatureLoading language={language} />}><FriendClashRecipient token={challengeToken} repository={repository} userId={userId} language={language} online={online} /></Suspense>
-  if (dataError) return <BackendGate title="Private data unavailable" message={dataError} action={{ label: 'Retry session', onClick: auth.retry }} />
-  if (hydratedUserId !== userId) return <BackendGate title="Loading your space…" message="Restoring your private debates and preferences." />
+  if (dataError) return <BackendGate title={t('status.privateUnavailable')} message={dataError} action={{ label: t('status.retrySession'), onClick: auth.retry }} />
+  if (hydratedUserId !== userId) return <BackendGate title={t('status.connecting')} message={t('status.loadingSpace')} />
   if (!hasOnboarded || showOnboarding) return <Onboarding userId={userId} language={language} initialProgress={{ stage: preferencesData.onboardingStage, goal: preferencesData.onboardingGoal, name: profileData.displayName || '', selected: preferencesData.topicPreferences }} onProgress={async (stage, goal, name, selected) => { if (!repository || !userId) return; const next = normalizePreferences({ ...preferencesData, userId, onboardingStage: stage, onboardingGoal: goal, topicPreferences: selected }); setPreferencesData(next); await repository.savePreferences(next); if (name.trim() && name !== profileData.displayName) { const nextProfile = normalizeProfile({ ...profileData, id: userId, displayName: name }); setProfileData(nextProfile); await repository.saveProfile(nextProfile) } }} onComplete={async (...args) => { await completeOnboarding(...args); setShowOnboarding(false) }} onLanguageChange={setLanguage} onFirstAction={action => { setActiveTake(activeTake); if (action === 'person') setScreen('clash'); else openTeamDebate() }} />
   const hasUnsavedDraft = screen === 'debate' ? Boolean(responses[debateStep]?.trim()) : screen === 'aiDebate' ? hasArgumentDraft(`ai:${debateId}`) || Boolean(aiSnapshot?.partialResponse) : false
   function navigate(next: Screen) {
     if (next === 'results' && !lastResult) return notify('Complete a debate to unlock your shifts.')
     if (next === screen) return
-    if (hasUnsavedDraft && !window.confirm('You have an unsent argument. Leave it saved and return later?')) return
+    if (hasUnsavedDraft && !window.confirm(t('classic.exitConfirm'))) return
     setScreen(next)
   }
-  const legacyChildren = screen === 'aiSetup' ? <AiSetup provider={aiProvider} basicProvider={basicAiProvider} puterProvider={mockAi ? mockAiProvider : liveAiProvider || unavailablePuterProvider} take={aiTake} language={language} preferences={preferencesData} preset={aiPreset} mock={mockAi} onStart={startAiDebate} onBack={() => setScreen('home')} /> : screen === 'aiDebate' && aiConfig && aiSnapshot ? <AiDebate provider={aiProvider} take={aiTake} language={language} config={aiConfig} snapshot={aiSnapshot} draftId={debateId} onSnapshot={setAiSnapshot} onComplete={completeAiDebate} onExit={() => void exitAiDebate()} onFeedback={recordAiFeedback} onNotify={notify} /> : screen === 'aiResults' && lastResult ? <><AiResults language={language} result={lastResult} onRematch={() => beginAiSetup(aiTake, aiConfig ? { ...aiConfig } : undefined)} onSwap={() => { if (aiConfig) void startAiDebate({ ...aiConfig, userSide: aiConfig.aiSide, aiSide: aiConfig.userSide }, aiTake).catch(caught => notify(caught instanceof Error ? caught.message : 'The AI rematch could not start.')) }} onChangeOpponent={() => beginAiSetup(aiTake)} onAnotherTake={() => beginAiSetup(selectPersonalizedTakes(interests, history.map(result => result.take.id), 1)[0] || takes[0])} /><BetaFeedbackForm language={language} surface="debate_result" screen="aiResults" aiModelId={lastResult.ai?.modelId} onSubmit={submitBetaFeedback} /></> : screen === 'home' ? <PersonalHome userName={userName} language={language} interests={interests} history={history} stats={personalStats} activeDebate={Boolean(debateId)} lastResult={lastResult} preferredMode={preferencesData.preferredMode} onBegin={beginDebate} onChooseDebate={beginDebateChoice} onResume={() => setScreen(aiSnapshot && aiConfig ? 'aiDebate' : 'debate')} onExplore={() => setScreen('explore')} onClash={() => setScreen('clash')} onProfile={() => setScreen('profile')} onSettings={() => setScreen('settings')} onNotify={notify} /> : screen === 'explore' ? <PersonalExplore language={language} interests={interests} recentIds={history.map(result => result.take.id)} onBegin={beginDebate} onChooseDebate={beginDebateChoice} onNotify={notify} /> : screen === 'profile' ? <PersonalProfile profile={profileData} language={language} stats={personalStats} history={history} onSettings={() => setScreen('settings')} onBack={() => setScreen('home')} /> : <SettingsScreen profile={profileData} preferences={preferencesData} aiMode={aiMode} backendLabel={repository.backend === 'supabase' ? 'Private cloud beta' : 'Device-only development'} repository={repository} userId={userId} onSaveProfile={saveProfileSettings} onSavePreferences={savePreferenceSettings} onDelete={() => void deleteBetaData()} onBack={() => setScreen('profile')} onNotify={notify} onSubmitFeedback={submitBetaFeedback} />
-  const settingsChildren = <ProfileSettings profile={profileData} preferences={preferencesData} user={auth.user} userId={userId} repository={repository} language={language} onSaveProfile={saveProfileSettings} onSavePreferences={savePreferenceSettings} onBack={() => setScreen('profile')} onNotify={notify} onDelete={() => void deleteBetaData()} onSignOut={auth.resetSession} onRequestSecureAccountOtp={auth.requestSecureAccountOtp} onVerifySecureAccountOtp={auth.verifySecureAccountOtp} onOpenOnboarding={() => setShowOnboarding(true)} onOpenProfile={key => { setProfileViewKey(key); setProfileViewReturn('settings'); setScreen('profileView') }} hasUnsavedDraft={hasUnsavedDraft} />
+  const legacyChildren = screen === 'aiSetup' ? <AiSetup provider={aiProvider} basicProvider={basicAiProvider} puterProvider={mockAi ? mockAiProvider : liveAiProvider || unavailablePuterProvider} take={aiTake} language={language} preferences={preferencesData} preset={aiPreset} mock={mockAi} online={online} engineStatusNote={engineStatusNote} onStart={startAiDebate} onBack={() => setScreen('home')} /> : screen === 'aiDebate' && aiConfig && aiSnapshot ? <AiDebate provider={aiProvider} take={aiTake} language={language} config={aiConfig} snapshot={aiSnapshot} draftId={debateId} online={online} engineStatusNote={engineStatusNote} onSnapshot={setAiSnapshot} onComplete={completeAiDebate} onExit={() => void exitAiDebate()} onFeedback={recordAiFeedback} onNotify={notify} /> : screen === 'aiResults' && lastResult ? <><AiResults language={language} result={lastResult} onRematch={() => beginAiSetup(aiTake, aiConfig ? { ...aiConfig } : undefined)} onSwap={() => { if (aiConfig) void startAiDebate({ ...aiConfig, userSide: aiConfig.aiSide, aiSide: aiConfig.userSide }, aiTake).catch(caught => notify(caught instanceof Error ? caught.message : 'The AI rematch could not start.')) }} onChangeOpponent={() => beginAiSetup(aiTake)} onAnotherTake={() => beginAiSetup(selectPersonalizedTakes(interests, history.map(result => result.take.id), 1)[0] || takes[0])} /><BetaFeedbackForm language={language} surface="debate_result" screen="aiResults" aiModelId={lastResult.ai?.modelId} onSubmit={submitBetaFeedback} /></> : screen === 'home' ? <PersonalHome userName={userName} language={language} interests={interests} history={history} stats={personalStats} activeDebate={Boolean(debateId)} lastResult={lastResult} preferredMode={preferencesData.preferredMode} onBegin={beginDebate} onChooseDebate={beginDebateChoice} onResume={() => setScreen(debateRecoveryIssue ? 'debateRecovery' : aiSnapshot && aiConfig ? 'aiDebate' : 'debate')} onExplore={() => openExplore()} onExploreCategory={category => openExplore(category)} onClash={() => setScreen('clash')} onProfile={() => setScreen('profile')} onSettings={() => setScreen('settings')} onViewResult={viewResult} onNotify={notify} /> : screen === 'explore' ? <PersonalExplore language={language} interests={interests} recentIds={history.map(result => result.take.id)} initialFilter={exploreFilter} onBegin={beginDebate} onChooseDebate={beginDebateChoice} onEditInterests={openSettingsForInterests} onNotify={notify} /> : screen === 'profile' ? <PersonalProfile profile={profileData} language={language} stats={personalStats} history={history} onSettings={() => setScreen('settings')} onBack={() => setScreen('home')} onViewResult={viewResult} /> : <SettingsScreen profile={profileData} preferences={preferencesData} aiMode={aiMode} backendLabel={repository.backend === 'supabase' ? 'Private cloud beta' : 'Device-only development'} repository={repository} userId={userId} onSaveProfile={saveProfileSettings} onSavePreferences={savePreferenceSettings} onDelete={() => void deleteBetaData()} onBack={() => setScreen('profile')} onNotify={notify} onSubmitFeedback={submitBetaFeedback} />
+  const settingsChildren = <ProfileSettings profile={profileData} preferences={preferencesData} user={auth.user} userId={userId} repository={repository} language={language} backendLabel={repository.backend === 'supabase' ? 'Private cloud beta' : 'Device-only development'} aiMode={aiMode} initialSection={settingsInitialSection} onSaveProfile={saveProfileSettings} onSavePreferences={savePreferenceSettings} onBack={() => { setSettingsInitialSection('hub'); setScreen('profile') }} onNotify={notify} onDelete={() => void deleteBetaData()} onSignOut={auth.resetSession} onRequestSecureAccountOtp={auth.requestSecureAccountOtp} onVerifySecureAccountOtp={auth.verifySecureAccountOtp} onOpenOnboarding={() => setShowOnboarding(true)} onOpenProfile={key => { setProfileViewKey(key); setProfileViewReturn('settings'); setScreen('profileView') }} onSubmitBetaFeedback={submitBetaFeedback} hasUnsavedDraft={hasUnsavedDraft} />
 // Active tree: App -> AppShellV2 -> screen-specific children.
   const children = <Suspense fallback={<FeatureLoading language={language} />}>
-    {screen === 'friends' ? <Friends userId={userId} language={language} repository={repository} profile={profileData} onProfile={setProfileData} onBack={() => setScreen('home')} online={online} onNotify={notify} /> : screen === 'groups' ? <Groups userId={userId} language={language} repository={repository} initialGroupId={groupPathId} onStartTeam={openTeamDebate} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'team' ? <TeamDebate userId={userId} language={language} initialTake={activeTake} initialTopic={teamInitialTopic} groupId={activeGroupId} session={teamSession} onStart={startTeamSession} onSave={saveTeamSession} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'profileView' && profileViewKey ? <ProfileViewScreen userId={userId} profileKey={profileViewKey} language={language} repository={repository} onBack={() => setScreen(profileViewReturn)} /> : screen === 'settings' ? settingsChildren : screen === 'debateChoice' ? <ClassicDebateSetup take={activeTake} language={language} onBack={() => setScreen('home')} onAi={() => beginAiSetup(activeTake)} onPerson={() => setScreen('clash')} onTeam={() => openTeamDebate()} /> : screen === 'debate' ? <ClassicDebateSession activeTake={activeTake} language={language} mode={activeMode} step={debateStep} setStep={setDebateStep} stance={stance} setStance={setStance} confidence={confidence} setConfidence={setConfidence} postStance={postStance} setPostStance={setPostStance} understanding={understanding} setUnderstanding={setUnderstanding} responses={responses} setResponses={setResponses} opponentMessages={opponentMessages} setOpponentMessages={setOpponentMessages} onModeChange={setActiveMode} onComplete={completeDebate} onExit={() => setScreen('home')} onNotify={notify} onReport={submitReport} onPersistRound={persistDebateRound} aiMode={aiMode} online={online} /> : screen === 'results' && lastResult ? <><ClassicDebateResult result={lastResult} language={language} onBegin={beginDebate} onClash={() => setScreen('clash')} onNotify={notify} /><BetaFeedbackForm language={language} surface="debate_result" screen="results" onSubmit={submitBetaFeedback} /></> : screen === 'clash' ? <FriendClashSetup userId={userId} language={language} repository={repository} initialTake={activeTake} onBack={() => setScreen('home')} onBegin={beginDebate} onNotify={notify} online={online} /> : legacyChildren}
+    {screen === 'debateRecovery' && debateRecoveryIssue ? <DebateRecoveryScreen language={language} issue={debateRecoveryIssue} busy={recoveryBusy} onResume={resumeRecoveredDebate} onHome={() => setScreen('home')} onDiscard={() => void discardBrokenDebate()} /> : screen === 'friends' ? <Friends userId={userId} language={language} repository={repository} profile={profileData} onProfile={setProfileData} onBack={() => setScreen('home')} online={online} onNotify={notify} /> : screen === 'groups' ? <Groups userId={userId} language={language} repository={repository} initialGroupId={groupPathId} onStartTeam={openTeamDebate} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'team' ? <TeamDebate userId={userId} language={language} initialTake={activeTake} initialTopic={teamInitialTopic} groupId={activeGroupId} session={teamSession} onStart={startTeamSession} onSave={saveTeamSession} onBack={() => setScreen('home')} onNotify={notify} /> : screen === 'profileView' && profileViewKey ? <ProfileViewScreen userId={userId} profileKey={profileViewKey} language={language} repository={repository} onBack={() => setScreen(profileViewReturn)} /> : screen === 'settings' ? settingsChildren : screen === 'debateChoice' ? <ClassicDebateSetup take={activeTake} language={language} onBack={() => setScreen('home')} onAi={() => beginAiSetup(activeTake)} onPerson={() => setScreen('clash')} onTeam={() => openTeamDebate()} /> : screen === 'debate' ? <ClassicDebateSession activeTake={activeTake} language={language} mode={activeMode} step={debateStep} setStep={setDebateStep} stance={stance} setStance={setStance} confidence={confidence} setConfidence={setConfidence} postStance={postStance} setPostStance={setPostStance} understanding={understanding} setUnderstanding={setUnderstanding} responses={responses} setResponses={setResponses} opponentMessages={opponentMessages} setOpponentMessages={setOpponentMessages} onModeChange={setActiveMode} onComplete={completeDebate} onExit={() => setScreen('home')} onNotify={notify} onReport={submitReport} onPersistRound={persistDebateRound} aiMode={aiMode} online={online} /> : screen === 'results' && lastResult ? <><ClassicDebateResult result={lastResult} language={language} onBegin={beginDebate} onClash={() => setScreen('clash')} onNotify={notify} /><BetaFeedbackForm language={language} surface="debate_result" screen="results" onSubmit={submitBetaFeedback} /></> : screen === 'clash' ? <FriendClashSetup userId={userId} language={language} repository={repository} initialTake={activeTake} onBack={() => setScreen('home')} onBegin={beginDebate} onNotify={notify} online={online} /> : legacyChildren}
   </Suspense>
   function cycleLanguage() {
     const index = supportedLanguages.indexOf(language)
@@ -923,7 +1041,7 @@ function App() {
       void Promise.all([repository.saveProfile(nextProfile), repository.savePreferences(nextPreferences)]).then(() => { setProfileData(nextProfile); setPreferencesData(nextPreferences) }).catch(() => undefined)
     }
   }
-  return <AppShellV2 screen={screen} name={userName} historyCount={history.length} onNavigate={navigate} onLanguage={cycleLanguage} language={language} aiMode={aiMode} onNotify={notify} online={online} onDelete={() => void deleteBetaData()} hasUnsavedDraft={hasUnsavedDraft}>{repository.backend === 'local' && <div className="backend-warning" role="status">Development only: local persistence is active.</div>}{children}{toast && <div className="toast" role="status"><Icon name="info" size={15} /> {toast}</div>}{showGuide && <FirstUseGuide language={language} onClose={() => { markFirstUseGuideSeen(); setShowGuide(false) }} />}</AppShellV2>
+  return <AppShellV2 screen={screen} name={userName} historyCount={history.length} onNavigate={navigate} onLanguage={cycleLanguage} language={language} aiMode={aiMode} onNotify={notify} onHelp={openHelp} online={online} onDelete={() => void deleteBetaData()} hasUnsavedDraft={hasUnsavedDraft} debateFocus={screen === 'aiDebate'}>{repository.backend === 'local' && <div className="backend-warning" role="status">Development only: local persistence is active.</div>}{children}{toast && <div className="toast" role="status" aria-live="polite"><Icon name="info" size={15} /> {toast}</div>}{showGuide && <FirstUseGuide language={language} onClose={() => { markFirstUseGuideSeen(); setShowGuide(false) }} />}</AppShellV2>
 }
 
 export default App

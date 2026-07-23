@@ -32,7 +32,7 @@ export function createMockAiProvider(options: { models?: unknown[]; response?: s
 }
 
 export function createUnavailableAiProvider(kind: 'puter' | 'basic' = 'puter'): AiProvider {
-  const fail = async <T>(): Promise<T> => { throw new AiProviderError('provider_unavailable', kind === 'puter' ? 'Connect Puter before starting this debate.' : 'SideShift Basic is temporarily unavailable.') }
+  const fail = async <T>(): Promise<T> => { throw new AiProviderError('provider_unavailable', kind === 'puter' ? 'Connect Puter before starting this debate.' : 'SideShift AI is temporarily unavailable.') }
   return {
     kind,
     async getStatus() { return 'failed' },

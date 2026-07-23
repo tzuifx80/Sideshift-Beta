@@ -28,14 +28,14 @@ async function readJson<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({})) as { error?: { message?: string; code?: string } }
   if (!response.ok) {
     const code = payload.error?.code
-    throw new AiProviderError(code === 'rate_limited' ? 'rate_limited' : code === 'quota_exhausted' ? 'allowance_exhausted' : code === 'provider_unavailable' ? 'provider_unavailable' : 'request_failed', payload.error?.message || `SideShift Basic request failed (${response.status}).`, false, response.status)
+    throw new AiProviderError(code === 'rate_limited' ? 'rate_limited' : code === 'quota_exhausted' ? 'allowance_exhausted' : code === 'provider_unavailable' ? 'provider_unavailable' : 'request_failed', payload.error?.message || `SideShift AI request failed (${response.status}).`, false, response.status)
   }
   return payload as T
 }
 
 function readOpponentResponse(payload: unknown): { response: string } {
   const response = payload && typeof payload === 'object' ? (payload as { response?: unknown }).response : undefined
-  if (typeof response !== 'string' || !response.trim() || response.length > 700) throw new AiProviderError('invalid_response', 'SideShift Basic returned an invalid response.')
+  if (typeof response !== 'string' || !response.trim() || response.length > 700) throw new AiProviderError('invalid_response', 'SideShift AI returned an invalid response.')
   return { response: response.trim() }
 }
 
@@ -74,14 +74,14 @@ export class BasicAiProvider implements AiProvider {
     this.status = 'connecting'
     try {
       const capability = await this.loadCapability()
-      if (!capability.available) throw new AiProviderError('provider_unavailable', 'SideShift Basic is temporarily unavailable. Keep Connect Puter available.')
+      if (!capability.available) throw new AiProviderError('provider_unavailable', 'SideShift AI is temporarily unavailable. Keep Connect Puter available.')
       this.status = 'connected'
     } catch (error) { this.status = 'failed'; throw normalizeAiError(error) }
   }
 
   async listModels(): Promise<AiModel[]> {
     if (this.status !== 'connected') await this.connect()
-    return normalizeModels([{ id: 'sideshift-basic', provider: 'SideShift', name: 'SideShift Basic', max_tokens: 180, capabilities: ['text', 'chat', 'streaming'] }])
+    return normalizeModels([{ id: 'sideshift-basic', provider: 'SideShift', name: 'SideShift AI', max_tokens: 180, capabilities: ['text', 'chat', 'streaming'] }])
   }
 
   async getUsage(): Promise<AiUsage | null> {
